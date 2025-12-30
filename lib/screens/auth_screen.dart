@@ -52,255 +52,341 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFECFDF5), Color(0xFFEFF6FF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFFECFDF5),
+              Colors.white,
+              const Color(0xFFEFF6FF).withOpacity(0.3),
+            ],
           ),
         ),
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                const SizedBox(height: 32),
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  const SizedBox(height: 48),
 
-                // Header
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF10B981), Color(0xFF3B82F6)],
+                  // Logo JINEN
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Image.asset(
+                      'lib/Jinen.png',
+                      width: 120,
+                      height: 120,
+                      fit: BoxFit.contain,
                     ),
                   ),
-                  child: const Icon(Icons.child_care,
-                      color: Colors.white, size: 32),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  _mode == AuthMode.signin ? 'Bienvenue' : 'Créer un compte',
-                  style: const TextStyle(
-                      fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _mode == AuthMode.signin
-                      ? 'Connectez-vous pour continuer'
-                      : 'Rejoignez JINEN aujourd\'hui',
-                  style: const TextStyle(color: Color(0xFF6B7280)),
-                ),
-                const SizedBox(height: 32),
-
-                // User Type Selection (only for signup)
-                if (_mode == AuthMode.signup) ...[
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Je suis',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF374151),
-                      ),
+                  const SizedBox(height: 32),
+                  Text(
+                    _mode == AuthMode.signin ? 'Bienvenue' : 'Créer un compte',
+                    style: const TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1F2937),
+                      letterSpacing: -0.5,
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _UserTypeButton(
-                          icon: Icons.person,
-                          label: 'Parent',
-                          isSelected: _userType == UserType.parent,
-                          color: const Color(0xFF10B981),
-                          onTap: () =>
-                              setState(() => _userType = UserType.parent),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _UserTypeButton(
-                          icon: Icons.child_care,
-                          label: 'Garderie',
-                          isSelected: _userType == UserType.nursery,
-                          color: const Color(0xFF3B82F6),
-                          onTap: () =>
-                              setState(() => _userType = UserType.nursery),
-                        ),
-                      ),
-                    ],
+                  Text(
+                    _mode == AuthMode.signin
+                        ? 'Connectez-vous pour continuer'
+                        : 'Rejoignez JINEN aujourd\'hui',
+                    style: const TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontSize: 16,
+                    ),
                   ),
-                  const SizedBox(height: 24),
-                ],
+                  const SizedBox(height: 40),
 
-                // Form
-                Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (_mode == AuthMode.signup) ...[
-                        const Text('Nom complet',
-                            style: TextStyle(fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _nameController,
-                          decoration: InputDecoration(
-                            hintText: 'Votre nom',
-                            prefixIcon: const Icon(Icons.person),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                          ),
-                          validator: (value) =>
-                              value?.isEmpty ?? true ? 'Champ requis' : null,
+                  // User Type Selection (only for signup)
+                  if (_mode == AuthMode.signup) ...[
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Je suis',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF374151),
                         ),
-                        const SizedBox(height: 16),
-                      ],
-                      const Text('Email',
-                          style: TextStyle(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: InputDecoration(
-                          hintText: 'votre@email.com',
-                          prefixIcon: const Icon(Icons.email),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          filled: true,
-                          fillColor: Colors.white,
-                        ),
-                        validator: Validators.validateEmail,
                       ),
-                      const SizedBox(height: 16),
-                      if (_mode == AuthMode.signup) ...[
-                        const Text('Téléphone',
-                            style: TextStyle(fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _phoneController,
-                          keyboardType: TextInputType.phone,
-                          decoration: InputDecoration(
-                            hintText: '+216 12345678',
-                            prefixIcon: const Icon(Icons.phone),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _UserTypeButton(
+                            icon: Icons.person,
+                            label: 'Parent',
+                            isSelected: _userType == UserType.parent,
+                            color: const Color(0xFF10B981),
+                            onTap: () =>
+                                setState(() => _userType = UserType.parent),
                           ),
-                          validator: Validators.validateTunisianPhone,
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _UserTypeButton(
+                            icon: Icons.child_care,
+                            label: 'Garderie',
+                            isSelected: _userType == UserType.nursery,
+                            color: const Color(0xFF3B82F6),
+                            onTap: () =>
+                                setState(() => _userType = UserType.nursery),
+                          ),
+                        ),
                       ],
-                      const Text('Mot de passe',
-                          style: TextStyle(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: true,
-                        decoration: InputDecoration(
-                          hintText: '••••••••',
-                          prefixIcon: const Icon(Icons.lock),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          filled: true,
-                          fillColor: Colors.white,
-                        ),
-                        validator: Validators.validatePassword,
-                      ),
-                      const SizedBox(height: 16),
-                      if (_mode == AuthMode.signin)
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () {},
-                            child: const Text(
-                              'Mot de passe oublié ?',
-                              style: TextStyle(color: Color(0xFF10B981)),
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _handleSubmit,
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ).copyWith(
-                            backgroundColor:
-                                MaterialStateProperty.all(Colors.transparent),
-                            elevation: MaterialStateProperty.all(0),
-                          ),
-                          child: Ink(
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF10B981), Color(0xFF3B82F6)],
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+
+                  // Form
+                  Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_mode == AuthMode.signup) ...[
+                          const Text('Nom complet',
+                              style: TextStyle(fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _nameController,
+                            decoration: InputDecoration(
+                              hintText: 'Votre nom',
+                              prefixIcon: const Icon(Icons.person_outline),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide:
+                                    const BorderSide(color: Color(0xFFE5E7EB)),
                               ),
-                              borderRadius: BorderRadius.circular(12),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide:
+                                    const BorderSide(color: Color(0xFFE5E7EB)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                    color: Color(0xFF10B981), width: 2),
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
                             ),
-                            child: Container(
-                              alignment: Alignment.center,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              child: Text(
-                                _mode == AuthMode.signin
-                                    ? 'Se connecter'
-                                    : 'Créer mon compte',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
+                            validator: (value) =>
+                                value?.isEmpty ?? true ? 'Champ requis' : null,
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        const Text('Email',
+                            style: TextStyle(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: InputDecoration(
+                            hintText: 'votre@email.com',
+                            prefixIcon: const Icon(Icons.email_outlined),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide:
+                                  const BorderSide(color: Color(0xFFE5E7EB)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide:
+                                  const BorderSide(color: Color(0xFFE5E7EB)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFF10B981), width: 2),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                          validator: Validators.validateEmail,
+                        ),
+                        const SizedBox(height: 16),
+                        if (_mode == AuthMode.signup) ...[
+                          const Text('Téléphone',
+                              style: TextStyle(fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _phoneController,
+                            keyboardType: TextInputType.phone,
+                            decoration: InputDecoration(
+                              hintText: '+216 12345678',
+                              prefixIcon: const Icon(Icons.phone_outlined),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide:
+                                    const BorderSide(color: Color(0xFFE5E7EB)),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide:
+                                    const BorderSide(color: Color(0xFFE5E7EB)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                    color: Color(0xFF10B981), width: 2),
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
+                            ),
+                            validator: Validators.validateTunisianPhone,
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        const Text('Mot de passe',
+                            style: TextStyle(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _passwordController,
+                          obscureText: true,
+                          decoration: InputDecoration(
+                            hintText: '••••••••',
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide:
+                                  const BorderSide(color: Color(0xFFE5E7EB)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide:
+                                  const BorderSide(color: Color(0xFFE5E7EB)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFF10B981), width: 2),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                          validator: Validators.validatePassword,
+                        ),
+                        const SizedBox(height: 16),
+                        if (_mode == AuthMode.signin)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () {},
+                              child: const Text(
+                                'Mot de passe oublié ?',
+                                style: TextStyle(color: Color(0xFF10B981)),
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 16),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _handleSubmit,
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
+                              shadowColor: Colors.transparent,
+                            ).copyWith(
+                              backgroundColor:
+                                  MaterialStateProperty.all(Colors.transparent),
+                            ),
+                            child: Ink(
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFF10B981),
+                                    Color(0xFF3B82F6)
+                                  ],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF10B981)
+                                        .withOpacity(0.3),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Container(
+                                alignment: Alignment.center,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 18),
+                                child: Text(
+                                  _mode == AuthMode.signin
+                                      ? 'Se connecter'
+                                      : 'Créer mon compte',
+                                  style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    letterSpacing: 0.5,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Toggle Mode
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _mode == AuthMode.signin
+                            ? 'Pas encore de compte ?'
+                            : 'Déjà inscrit ?',
+                        style: const TextStyle(color: Color(0xFF6B7280)),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _mode = _mode == AuthMode.signin
+                                ? AuthMode.signup
+                                : AuthMode.signin;
+                          });
+                        },
+                        child: Text(
+                          _mode == AuthMode.signin
+                              ? 'S\'inscrire'
+                              : 'Se connecter',
+                          style: const TextStyle(color: Color(0xFF10B981)),
+                        ),
                       ),
                     ],
                   ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Toggle Mode
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      _mode == AuthMode.signin
-                          ? 'Pas encore de compte ?'
-                          : 'Déjà inscrit ?',
-                      style: const TextStyle(color: Color(0xFF6B7280)),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _mode = _mode == AuthMode.signin
-                              ? AuthMode.signup
-                              : AuthMode.signin;
-                        });
-                      },
-                      child: Text(
-                        _mode == AuthMode.signin
-                            ? 'S\'inscrire'
-                            : 'Se connecter',
-                        style: const TextStyle(color: Color(0xFF10B981)),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
