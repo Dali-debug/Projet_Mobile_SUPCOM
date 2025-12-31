@@ -1,10 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
+import '../services/review_service.dart';
+import '../models/review.dart';
 import 'enrollment_screen.dart';
 
-class NurseryDetails extends StatelessWidget {
+class NurseryDetails extends StatefulWidget {
   const NurseryDetails({super.key});
+
+  @override
+  State<NurseryDetails> createState() => _NurseryDetailsState();
+}
+
+class _NurseryDetailsState extends State<NurseryDetails> {
+  final ReviewService _reviewService = ReviewService();
+  List<Review> _reviews = [];
+  bool _isLoadingReviews = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReviews();
+  }
+
+  Future<void> _loadReviews() async {
+    final appState = Provider.of<AppState>(context, listen: false);
+    final nursery = appState.selectedNursery;
+
+    if (nursery != null) {
+      setState(() => _isLoadingReviews = true);
+      final reviews = await _reviewService.getReviewsByNursery(nursery.id);
+      setState(() {
+        _reviews = reviews;
+        _isLoadingReviews = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -358,34 +389,115 @@ class NurseryDetails extends StatelessWidget {
                               ),
 
                               // Avis
-                              Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(20),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.reviews,
-                                          size: 64, color: Colors.grey[300]),
-                                      const SizedBox(height: 16),
-                                      Text(
-                                        '${nursery.reviewCount} avis',
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
+                              _isLoadingReviews
+                                  ? const Center(
+                                      child: CircularProgressIndicator())
+                                  : _reviews.isEmpty
+                                      ? Center(
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(20),
+                                            child: Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Icon(Icons.reviews,
+                                                    size: 64,
+                                                    color: Colors.grey[300]),
+                                                const SizedBox(height: 16),
+                                                Text(
+                                                  'Aucun avis pour le moment',
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    color: Colors.grey[600],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        )
+                                      : ListView.builder(
+                                          padding: const EdgeInsets.all(20),
+                                          itemCount: _reviews.length,
+                                          itemBuilder: (context, index) {
+                                            final review = _reviews[index];
+                                            return Card(
+                                              margin: const EdgeInsets.only(
+                                                  bottom: 12),
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.all(16),
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        CircleAvatar(
+                                                          backgroundColor:
+                                                              const Color(
+                                                                  0xFF00BFA5),
+                                                          child: Text(
+                                                            review.parentName[0]
+                                                                .toUpperCase(),
+                                                            style:
+                                                                const TextStyle(
+                                                                    color: Colors
+                                                                        .white),
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                            width: 12),
+                                                        Expanded(
+                                                          child: Column(
+                                                            crossAxisAlignment:
+                                                                CrossAxisAlignment
+                                                                    .start,
+                                                            children: [
+                                                              Text(
+                                                                review
+                                                                    .parentName,
+                                                                style:
+                                                                    const TextStyle(
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                ),
+                                                              ),
+                                                              Row(
+                                                                children: List
+                                                                    .generate(
+                                                                  5,
+                                                                  (i) => Icon(
+                                                                    i < review.rating.floor()
+                                                                        ? Icons
+                                                                            .star
+                                                                        : Icons
+                                                                            .star_border,
+                                                                    size: 16,
+                                                                    color: Colors
+                                                                        .amber,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    const SizedBox(height: 8),
+                                                    Text(
+                                                      review.comment,
+                                                      style: TextStyle(
+                                                        color: Colors.grey[700],
+                                                        height: 1.5,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            );
+                                          },
                                         ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'Moyenne: ${nursery.rating}/5',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey[600],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
                             ],
                           ),
                         ),
@@ -410,45 +522,51 @@ class NurseryDetails extends StatelessWidget {
             BoxShadow(
               color: Colors.black.withOpacity(0.1),
               blurRadius: 10,
-              offset: const Offset(0, -2),
+              offset: const Offset(0, -5),
             ),
           ],
         ),
-        child: SafeArea(
-          child: Container(
+        child: ElevatedButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => EnrollmentScreen(
+                  nurseryId: nursery.id,
+                  nurseryName: nursery.name,
+                  price: nursery.price,
+                ),
+              ),
+            );
+          },
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            elevation: 0,
+          ).copyWith(
+            backgroundColor: MaterialStateProperty.all(Colors.transparent),
+          ),
+          child: Ink(
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [Color(0xFF00BFA5), Color(0xFF00ACC1)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
               ),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => EnrollmentScreen(
-                      nurseryId: nursery.id,
-                      nurseryName: nursery.name,
-                      price: nursery.price,
-                    ),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                shadowColor: Colors.transparent,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
+            child: Container(
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(vertical: 18),
               child: const Text(
                 'Inscrire mon enfant',
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 17,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
+                  letterSpacing: 0.5,
                 ),
               ),
             ),

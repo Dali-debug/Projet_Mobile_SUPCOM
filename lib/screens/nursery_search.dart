@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../models/nursery.dart';
-import '../models/review.dart';
 
 class NurserySearch extends StatefulWidget {
   const NurserySearch({super.key});
@@ -13,64 +12,34 @@ class NurserySearch extends StatefulWidget {
 
 class _NurserySearchState extends State<NurserySearch> {
   final _searchController = TextEditingController();
+  bool _isLoading = false;
+  List<Nursery> _searchResults = [];
 
-  // Mock data avec images
-  final List<Nursery> _nurseries = [
-    Nursery(
-      id: '1',
-      name: '15 Avenue Habib Bourguiba, Tunis',
-      address: '15 Avenue Habib Bourguiba, Tunis',
-      distance: 0.8,
-      rating: 4.8,
-      reviewCount: 124,
-      price: 350,
-      availableSpots: 3,
-      totalSpots: 20,
-      hours: '7:00 - 18:00',
-      photo:
-          'https://images.unsplash.com/photo-1587654780291-39c9404d746b?w=400',
-      description: 'Garderie moderne avec programme bilingue français-arabe',
-      activities: ['Musique', 'Art', 'Sport', 'Langues'],
-      staff: 8,
-      ageRange: '3 mois - 5 ans',
-    ),
-    Nursery(
-      id: '2',
-      name: '42 Rue de la République, Ariana',
-      address: '42 Rue de la République, Ariana',
-      distance: 1.5,
-      rating: 4.6,
-      reviewCount: 89,
-      price: 320,
-      availableSpots: 5,
-      totalSpots: 25,
-      hours: '7:30 - 17:30',
-      photo: 'https://images.unsplash.com/photo-1544776193-352d25ca82cd?w=400',
-      description: 'Espace lumineux et sécurisé pour vos enfants',
-      activities: ['Éveil musical', 'Peinture', 'Jeux éducatifs'],
-      staff: 6,
-      ageRange: '6 mois - 4 ans',
-    ),
-    Nursery(
-      id: '3',
-      name: 'Les Petits Génies',
-      address: 'La Marsa, Tunis',
-      distance: 2.3,
-      rating: 4.9,
-      reviewCount: 156,
-      price: 420,
-      availableSpots: 2,
-      totalSpots: 30,
-      hours: '7:00 - 18:30',
-      photo:
-          'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=400',
-      description:
-          'Programme d\'excellence pour l\'épanouissement de votre enfant',
-      activities: ['Montessori', 'Yoga', 'Anglais', 'Sciences'],
-      staff: 10,
-      ageRange: '1 - 5 ans',
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadNurseries();
+  }
+
+  Future<void> _loadNurseries() async {
+    setState(() => _isLoading = true);
+    final appState = Provider.of<AppState>(context, listen: false);
+    final results = await appState.searchNurseries();
+    setState(() {
+      _searchResults = results;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _searchNurseries(String query) async {
+    setState(() => _isLoading = true);
+    final appState = Provider.of<AppState>(context, listen: false);
+    final results = await appState.searchNurseries(city: query);
+    setState(() {
+      _searchResults = results;
+      _isLoading = false;
+    });
+  }
 
   @override
   void dispose() {
@@ -141,10 +110,20 @@ class _NurserySearchState extends State<NurserySearch> {
                   ),
                   child: TextField(
                     controller: _searchController,
+                    onSubmitted: _searchNurseries,
                     decoration: InputDecoration(
-                      hintText: 'Nom, adresse...',
+                      hintText: 'Nom, ville...',
                       hintStyle: TextStyle(color: Colors.grey[400]),
                       prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchController.clear();
+                                _loadNurseries();
+                              },
+                            )
+                          : null,
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 16),
@@ -161,7 +140,7 @@ class _NurserySearchState extends State<NurserySearch> {
                     Icon(Icons.location_on, color: Colors.white, size: 16),
                     SizedBox(width: 8),
                     Text(
-                      'Tunis, Tunisia',
+                      'Tunisie',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 14,
@@ -183,35 +162,46 @@ class _NurserySearchState extends State<NurserySearch> {
                       topRight: Radius.circular(30),
                     ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Text(
-                          '${_nurseries.length} garderies trouvées',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF2C3E50),
-                          ),
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Text(
+                                '${_searchResults.length} garderies trouvées',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF2C3E50),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: _searchResults.isEmpty
+                                  ? const Center(
+                                      child: Text(
+                                        'Aucune garderie trouvée',
+                                        style: TextStyle(color: Colors.grey),
+                                      ),
+                                    )
+                                  : ListView.builder(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 20),
+                                      itemCount: _searchResults.length,
+                                      itemBuilder: (context, index) {
+                                        final nursery = _searchResults[index];
+                                        return _NurseryCard(
+                                          nursery: nursery,
+                                          onTap: () =>
+                                              appState.selectNursery(nursery),
+                                        );
+                                      },
+                                    ),
+                            ),
+                          ],
                         ),
-                      ),
-                      Expanded(
-                        child: ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          itemCount: _nurseries.length,
-                          itemBuilder: (context, index) {
-                            final nursery = _nurseries[index];
-                            return _NurseryCard(
-                              nursery: nursery,
-                              onTap: () => appState.selectNursery(nursery),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
             ],

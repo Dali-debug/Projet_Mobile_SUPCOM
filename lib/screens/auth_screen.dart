@@ -17,6 +17,8 @@ class _AuthScreenState extends State<AuthScreen> {
   AuthMode _mode = AuthMode.signin;
   UserType _userType = UserType.parent;
   final _formKey = GlobalKey<FormState>();
+  bool _isLoading = false;
+  String? _errorMessage;
 
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -32,19 +34,62 @@ class _AuthScreenState extends State<AuthScreen> {
     super.dispose();
   }
 
-  void _handleSubmit() {
-    if (_formKey.currentState!.validate()) {
-      // Mock authentication
-      final user = User(
-        id: '1',
-        name:
-            _nameController.text.isEmpty ? 'Utilisateur' : _nameController.text,
-        email: _emailController.text,
-        type: _userType,
-        phone: _phoneController.text.isEmpty ? null : _phoneController.text,
-      );
+  Future<void> _handleSubmit() async {
+    if (!_formKey.currentState!.validate()) return;
 
-      Provider.of<AppState>(context, listen: false).setUser(user);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final appState = Provider.of<AppState>(context, listen: false);
+
+      if (_mode == AuthMode.signin) {
+        // Login
+        final user = await appState.userService.login(
+          _emailController.text.trim(),
+          _passwordController.text,
+        );
+
+        if (user != null) {
+          await appState.setUser(user);
+        } else {
+          setState(() {
+            _errorMessage = 'Email ou mot de passe incorrect';
+          });
+        }
+      } else {
+        // Sign up
+        final user = await appState.userService.createUser(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          name: _nameController.text.trim(),
+          type: _userType,
+          phone: _phoneController.text.trim().isEmpty
+              ? null
+              : _phoneController.text.trim(),
+        );
+
+        if (user != null) {
+          await appState.setUser(user);
+        } else {
+          setState(() {
+            _errorMessage =
+                'Erreur lors de la création du compte. L\'email existe peut-être déjà.';
+          });
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Erreur: ${e.toString()}';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -297,11 +342,39 @@ class _AuthScreenState extends State<AuthScreen> {
                             ),
                           ),
                         const SizedBox(height: 16),
+
+                        // Error Message
+                        if (_errorMessage != null) ...[
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.red.shade200),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.error_outline,
+                                    color: Colors.red.shade700),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _errorMessage!,
+                                    style:
+                                        TextStyle(color: Colors.red.shade700),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+
                         const SizedBox(height: 8),
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                            onPressed: _handleSubmit,
+                            onPressed: _isLoading ? null : _handleSubmit,
                             style: ElevatedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 18),
                               shape: RoundedRectangleBorder(
@@ -337,17 +410,28 @@ class _AuthScreenState extends State<AuthScreen> {
                                 alignment: Alignment.center,
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 18),
-                                child: Text(
-                                  _mode == AuthMode.signin
-                                      ? 'Se connecter'
-                                      : 'Créer mon compte',
-                                  style: const TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                  Colors.white),
+                                        ),
+                                      )
+                                    : Text(
+                                        _mode == AuthMode.signin
+                                            ? 'Se connecter'
+                                            : 'Créer mon compte',
+                                        style: const TextStyle(
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
                               ),
                             ),
                           ),
@@ -369,13 +453,16 @@ class _AuthScreenState extends State<AuthScreen> {
                         style: const TextStyle(color: Color(0xFF6B7280)),
                       ),
                       TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _mode = _mode == AuthMode.signin
-                                ? AuthMode.signup
-                                : AuthMode.signin;
-                          });
-                        },
+                        onPressed: _isLoading
+                            ? null
+                            : () {
+                                setState(() {
+                                  _mode = _mode == AuthMode.signin
+                                      ? AuthMode.signup
+                                      : AuthMode.signin;
+                                  _errorMessage = null;
+                                });
+                              },
                         child: Text(
                           _mode == AuthMode.signin
                               ? 'S\'inscrire'

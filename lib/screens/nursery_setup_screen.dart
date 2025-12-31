@@ -1,10 +1,7 @@
-// ...existing code...
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/foundation.dart';
-import 'dart:typed_data';
 import '../providers/app_state.dart';
+import '../models/nursery.dart';
 
 class NurserySetupScreen extends StatefulWidget {
   const NurserySetupScreen({super.key});
@@ -14,47 +11,10 @@ class NurserySetupScreen extends StatefulWidget {
 }
 
 class _NurserySetupScreenState extends State<NurserySetupScreen> {
-  XFile? _selectedImage;
-
-  Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1200,
-      maxHeight: 1200,
-      imageQuality: 85,
-    );
-
-    if (pickedFile != null) {
-      setState(() {
-        _selectedImage = pickedFile;
-      });
-    }
-  }
-
-  Widget _buildImagePreview() {
-    if (_selectedImage == null) return const SizedBox.shrink();
-    return FutureBuilder<Uint8List>(
-      future: _selectedImage!.readAsBytes(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.done &&
-            snapshot.hasData) {
-          return Image.memory(
-            snapshot.data!,
-            width: double.infinity,
-            height: double.infinity,
-            fit: BoxFit.cover,
-          );
-        } else {
-          return const Center(child: CircularProgressIndicator());
-        }
-      },
-    );
-  }
-
   final _formKey = GlobalKey<FormState>();
   final _pageController = PageController();
   int _currentPage = 0;
+  bool _isLoading = false;
 
   // Form controllers
   final _nurseryNameController = TextEditingController();
@@ -63,12 +23,14 @@ class _NurserySetupScreenState extends State<NurserySetupScreen> {
   final _cityController = TextEditingController();
   final _postalCodeController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   final _priceController = TextEditingController();
   final _totalSpotsController = TextEditingController();
   final _minAgeController = TextEditingController();
   final _maxAgeController = TextEditingController();
   final _openingTimeController = TextEditingController();
   final _closingTimeController = TextEditingController();
+  final _imageUrlController = TextEditingController();
 
   // Selected values
   final List<String> _selectedActivities = [];
@@ -100,23 +62,24 @@ class _NurserySetupScreenState extends State<NurserySetupScreen> {
     _addressController.dispose();
     _cityController.dispose();
     _postalCodeController.dispose();
-    _pageController.dispose();
-    _nurseryNameController.dispose();
-    _descriptionController.dispose();
-    _addressController.dispose();
-    _cityController.dispose();
-    _postalCodeController.dispose();
     _phoneController.dispose();
+    _emailController.dispose();
     _priceController.dispose();
     _totalSpotsController.dispose();
     _minAgeController.dispose();
     _maxAgeController.dispose();
     _openingTimeController.dispose();
     _closingTimeController.dispose();
+    _imageUrlController.dispose();
     super.dispose();
   }
 
   void _nextPage() {
+    // Validate current page before moving to next
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
     if (_currentPage < 2) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
@@ -134,18 +97,90 @@ class _NurserySetupScreenState extends State<NurserySetupScreen> {
     }
   }
 
-  void _handleSubmit() {
-    if (_formKey.currentState!.validate()) {
-      // Complete the setup and navigate to nursery dashboard
-      Provider.of<AppState>(context, listen: false).completeNurserySetup();
+  Future<void> _handleSubmit() async {
+    if (!_formKey.currentState!.validate()) return;
 
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profil de garderie créé avec succès !'),
-          backgroundColor: Color(0xFF10B981),
-        ),
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final appState = Provider.of<AppState>(context, listen: false);
+      final user = appState.user;
+
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
+
+      // Prepare facilities list
+      final facilities = _selectedFacilities.entries
+          .where((entry) => entry.value)
+          .map((entry) => entry.key)
+          .toList();
+
+      // Calculate age range
+      final ageRange =
+          '${_minAgeController.text} - ${_maxAgeController.text} ans';
+
+      // Calculate hours
+      final hours =
+          '${_openingTimeController.text} - ${_closingTimeController.text}';
+
+      // Create nursery
+      final nursery = await appState.nurseryService.createNursery(
+        ownerId: user.id,
+        name: _nurseryNameController.text,
+        description: _descriptionController.text.isNotEmpty
+            ? _descriptionController.text
+            : null,
+        address: _addressController.text,
+        city: _cityController.text,
+        postalCode: _postalCodeController.text.isNotEmpty
+            ? _postalCodeController.text
+            : null,
+        phone: _phoneController.text.isNotEmpty ? _phoneController.text : null,
+        email: _emailController.text.isNotEmpty ? _emailController.text : null,
+        hours: hours,
+        pricePerMonth: double.parse(_priceController.text),
+        totalSpots: int.parse(_totalSpotsController.text),
+        ageRange: ageRange,
+        imageUrl: _imageUrlController.text.isNotEmpty
+            ? _imageUrlController.text
+            : null,
+        facilities: facilities,
+        activities: _selectedActivities,
       );
+
+      if (nursery != null) {
+        // Update app state
+        appState.completeNurserySetup();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profil de garderie créé avec succès !'),
+              backgroundColor: Color(0xFF10B981),
+            ),
+          );
+        }
+      } else {
+        throw Exception('Failed to create nursery');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -252,37 +287,46 @@ class _NurserySetupScreenState extends State<NurserySetupScreen> {
                   child: SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _currentPage == 2 ? _handleSubmit : _nextPage,
+                      onPressed: _isLoading
+                          ? null
+                          : (_currentPage == 2 ? _handleSubmit : _nextPage),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                         elevation: 0,
+                        disabledBackgroundColor: Colors.grey,
                       ).copyWith(
                         backgroundColor:
                             MaterialStateProperty.all(Colors.transparent),
                       ),
-                      child: Ink(
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Container(
-                          alignment: Alignment.center,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          child: Text(
-                            _currentPage == 2 ? 'Terminer' : 'Suivant',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
+                      child: _isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : Ink(
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFF667EEA),
+                                    Color(0xFF764BA2)
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Container(
+                                alignment: Alignment.center,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
+                                child: Text(
+                                  _currentPage == 2 ? 'Terminer' : 'Suivant',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                      ),
                     ),
                   ),
                 ),
@@ -318,108 +362,47 @@ class _NurserySetupScreenState extends State<NurserySetupScreen> {
           ),
           const SizedBox(height: 32),
 
-          // Photo Upload
-          const Text(
-            'Photo de la garderie *',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF374151),
-              fontSize: 14,
-            ),
+          // Image URL
+          _buildTextField(
+            label: 'URL de l\'image de la garderie',
+            controller: _imageUrlController,
+            hint: 'https://exemple.com/image.jpg',
+            icon: Icons.image,
           ),
           const SizedBox(height: 12),
-          GestureDetector(
-            onTap: _pickImage,
-            child: Container(
+          if (_imageUrlController.text.isNotEmpty)
+            Container(
               height: 180,
               decoration: BoxDecoration(
-                color: const Color(0xFFF9FAFB),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: const Color(0xFFE5E7EB),
                   width: 2,
                 ),
               ),
-              child: _selectedImage != null
-                  ? Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
-                          child: _buildImagePreview(),
-                        ),
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: IconButton(
-                              icon: const Icon(Icons.close, size: 20),
-                              onPressed: () {
-                                setState(() {
-                                  _selectedImage = null;
-                                });
-                              },
-                            ),
-                          ),
-                        ),
-                      ],
-                    )
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF667EEA).withOpacity(0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.camera_alt,
-                            size: 40,
-                            color: Color(0xFF667EEA),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Cliquez pour ajouter une photo',
-                          style: TextStyle(
-                            color: Color(0xFF6B7280),
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF667EEA),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.upload, size: 16, color: Colors.white),
-                              SizedBox(width: 8),
-                              Text(
-                                'Ajouter une photo',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.network(
+                  _imageUrlController.text,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.broken_image,
+                              size: 48, color: Colors.grey),
+                          SizedBox(height: 8),
+                          Text('Image non disponible',
+                              style: TextStyle(color: Colors.grey)),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
-          ),
           const SizedBox(height: 24),
 
           // Nursery Name
@@ -518,7 +501,7 @@ class _NurserySetupScreenState extends State<NurserySetupScreen> {
               color: Colors.grey[600],
             ),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 20),
 
           // Phone
           _buildTextField(
@@ -529,6 +512,16 @@ class _NurserySetupScreenState extends State<NurserySetupScreen> {
             keyboardType: TextInputType.phone,
             validator: (value) =>
                 value?.isEmpty ?? true ? 'Téléphone requis' : null,
+          ),
+          const SizedBox(height: 20),
+
+          // Email
+          _buildTextField(
+            label: 'Email de contact',
+            controller: _emailController,
+            hint: 'contact@garderie.tn',
+            icon: Icons.email,
+            keyboardType: TextInputType.emailAddress,
           ),
           const SizedBox(height: 20),
 

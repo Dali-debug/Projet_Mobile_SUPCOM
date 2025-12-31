@@ -14,11 +14,19 @@ dependencies:
   flutter_svg: ^2.0.9
   cached_network_image: ^3.3.0
   intl: ^0.18.1
-  shared_preferences: ^2.2.2
+  shared_preferences: ^2.5.4
   http: ^1.1.0
   image_picker: ^1.0.7
   # Web support for image_picker
   image_picker_for_web: ^2.0.0
+  # PostgreSQL database connection
+  postgres: ^2.6.2
+  # Environment variables
+  flutter_dotenv: ^5.1.0
+  # UUID generation
+  uuid: ^4.2.1
+  # Password hashing
+  crypto: ^3.0.3
 
 dev_dependencies:
   flutter_test:
