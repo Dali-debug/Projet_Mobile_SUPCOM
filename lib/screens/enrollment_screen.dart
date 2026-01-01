@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../utils/validators.dart';
+import '../services/enrollment_service_web.dart';
 
 class EnrollmentScreen extends StatefulWidget {
   final String nurseryId;
@@ -22,6 +23,8 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
   final _formKey = GlobalKey<FormState>();
   final _pageController = PageController();
   int _currentPage = 0;
+  bool _isSubmitting = false;
+  final EnrollmentServiceWeb _enrollmentService = EnrollmentServiceWeb();
 
   // Controllers - Enfant
   final _childNameController = TextEditingController();
@@ -98,16 +101,56 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
     }
   }
 
-  void _handleSubmit() {
+  void _handleSubmit() async {
     if (_formKey.currentState!.validate()) {
-      // TODO: Enregistrer l'inscription
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Inscription confirmée avec succès !'),
-          backgroundColor: Color(0xFF10B981),
-        ),
-      );
-      Navigator.pop(context);
+      setState(() => _isSubmitting = true);
+
+      try {
+        final result = await _enrollmentService.createEnrollment(
+          childName: _childNameController.text,
+          birthDate: _birthDateController.text,
+          parentName: _parentNameController.text,
+          parentPhone: _parentPhoneController.text,
+          nurseryId: widget.nurseryId,
+          startDate: _startDateController.text,
+          notes:
+              _notesController.text.isNotEmpty ? _notesController.text : null,
+        );
+
+        if (result != null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Inscription enregistrée avec succès !'),
+                backgroundColor: Color(0xFF10B981),
+              ),
+            );
+            Navigator.pop(context);
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Erreur lors de l\'inscription'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isSubmitting = false);
+        }
+      }
     }
   }
 
@@ -226,24 +269,36 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
                   Expanded(
                     flex: _currentPage == 0 ? 1 : 1,
                     child: ElevatedButton(
-                      onPressed: _currentPage == 2 ? _handleSubmit : _nextPage,
+                      onPressed: _isSubmitting
+                          ? null
+                          : (_currentPage == 2 ? _handleSubmit : _nextPage),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         backgroundColor: const Color(0xFF00BFA5),
+                        disabledBackgroundColor: Colors.grey[400],
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: Text(
-                        _currentPage == 2
-                            ? 'Confirmer l\'inscription'
-                            : 'Suivant',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : Text(
+                              _currentPage == 2
+                                  ? 'Confirmer l\'inscription'
+                                  : 'Suivant',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -483,7 +538,7 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
           const SizedBox(height: 8),
           TextFormField(
             controller: _startDateController,
-            validator: Validators.validateBirthDate,
+            validator: Validators.validateDate,
             readOnly: true,
             onTap: () => _selectDate(_startDateController),
             decoration: InputDecoration(

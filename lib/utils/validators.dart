@@ -104,4 +104,39 @@ class Validators {
 
     return null;
   }
+
+  // Validation de la date (format uniquement, pas de restriction temporelle)
+  static String? validateDate(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Date requise';
+    }
+
+    try {
+      final parts = value.split('/');
+      if (parts.length != 3) {
+        return 'Format invalide (mm/dd/yyyy)';
+      }
+
+      final month = int.parse(parts[0]);
+      final day = int.parse(parts[1]);
+      final year = int.parse(parts[2]);
+
+      // Vérifier que la date est valide
+      if (month < 1 || month > 12) {
+        return 'Mois invalide';
+      }
+      if (day < 1 || day > 31) {
+        return 'Jour invalide';
+      }
+      if (year < 1900 || year > 2100) {
+        return 'Année invalide';
+      }
+
+      // Tenter de créer la date pour validation
+      DateTime(year, month, day);
+      return null;
+    } catch (e) {
+      return 'Date invalide';
+    }
+  }
 }

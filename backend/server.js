@@ -499,16 +499,221 @@ app.get('/api/nurseries/:id', async (req, res) => {
   }
 });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString() 
-  });
+// ============== ENROLLMENT ENDPOINTS ==============
+
+// Create child and enrollment
+app.post('/api/enrollments', async (req, res) => {
+  const { 
+    childName, 
+    birthDate, 
+    parentName, 
+    parentPhone, 
+    nurseryId, 
+    startDate, 
+    notes,
+    parentId 
+  } = req.body;
+
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+
+    // 1. Create or get parent (using users table)
+    let parentIdToUse = parentId;
+    
+    if (!parentIdToUse) {
+      // Create a simple user account for the parent
+      const parentQuery = `
+        INSERT INTO users (email, password_hash, user_type, name, phone)
+        VALUES ($1, $2, 'parent', $3, $4)
+        RETURNING id
+      `;
+      // Generate a temporary email and password
+      const tempEmail = `parent_${Date.now()}@temp.com`;
+      const tempPassword = 'temp123'; // In production, this should be handled differently
+      const passwordHash = require('crypto').createHash('sha256').update(tempPassword).digest('hex');
+      
+      const parentResult = await client.query(parentQuery, [tempEmail, passwordHash, parentName, parentPhone]);
+      parentIdToUse = parentResult.rows[0].id;
+    }
+
+    // 2. Calculate age from birth date
+    const birthDateObj = new Date(birthDate);
+    const age = Math.floor((new Date() - birthDateObj) / (365.25 * 24 * 60 * 60 * 1000));
+
+    // 3. Create child
+    const childQuery = `
+      INSERT INTO children (parent_id, name, age, date_of_birth)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id
+    `;
+    const childResult = await client.query(childQuery, [parentIdToUse, childName, age, birthDate]);
+    const childId = childResult.rows[0].id;
+
+    // 4. Create enrollment
+    const enrollmentQuery = `
+      INSERT INTO enrollments (child_id, nursery_id, start_date, status)
+      VALUES ($1, $2, $3, 'pending')
+      RETURNING id, created_at
+    `;
+    const enrollmentResult = await client.query(enrollmentQuery, [
+      childId, 
+      nurseryId, 
+      startDate
+    ]);
+
+    await client.query('COMMIT');
+
+    res.status(201).json({
+      success: true,
+      enrollment: {
+        id: enrollmentResult.rows[0].id,
+        childId: childId,
+        parentId: parentIdToUse,
+        nurseryId: nurseryId,
+        createdAt: enrollmentResult.rows[0].created_at
+      }
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error creating enrollment:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to create enrollment' 
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// Get enrollments by nursery
+app.get('/api/enrollments/nursery/:nurseryId', async (req, res) => {
+  const { nurseryId } = req.params;
+
+  try {
+    const query = `
+      SELECT 
+        e.id as enrollment_id,
+        e.start_date,
+        e.status,
+        e.created_at,
+        c.id as child_id,
+        c.name as child_name,
+        c.date_of_birth,
+        c.age,
+        u.id as parent_id,
+        u.name as parent_name,
+        u.phone as parent_phone
+      FROM enrollments e
+      JOIN children c ON e.child_id = c.id
+      JOIN users u ON c.parent_id = u.id
+      WHERE e.nursery_id = $1
+      ORDER BY e.created_at DESC
+    `;
+    
+    const result = await pool.query(query, [nurseryId]);
+
+    const enrollments = result.rows.map(row => ({
+      enrollmentId: row.enrollment_id,
+      startDate: row.start_date,
+      status: row.status,
+      createdAt: row.created_at,
+      child: {
+        id: row.child_id,
+        name: row.child_name,
+        birthDate: row.date_of_birth,
+        age: row.age
+      },
+      parent: {
+        id: row.parent_id,
+        name: row.parent_name,
+        phone: row.parent_phone
+      }
+    }));
+
+    res.json({
+      success: true,
+      enrollments
+    });
+
+  } catch (error) {
+    console.error('Error fetching enrollments:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch enrollments' 
+    });
+  }
+});
+
+// Get ALL enrollments (for verification)
+app.get('/api/enrollments', async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        e.id as enrollment_id,
+        e.start_date,
+        e.status,
+        e.created_at,
+        c.id as child_id,
+        c.name as child_name,
+        c.date_of_birth,
+        c.age,
+        u.id as parent_id,
+        u.name as parent_name,
+        u.phone as parent_phone,
+        u.email as parent_email,
+        n.id as nursery_id,
+        n.name as nursery_name
+      FROM enrollments e
+      JOIN children c ON e.child_id = c.id
+      JOIN users u ON c.parent_id = u.id
+      JOIN nurseries n ON e.nursery_id = n.id
+      ORDER BY e.created_at DESC
+    `;
+    
+    const result = await pool.query(query);
+
+    const enrollments = result.rows.map(row => ({
+      enrollmentId: row.enrollment_id,
+      startDate: row.start_date,
+      status: row.status,
+      createdAt: row.created_at,
+      child: {
+        id: row.child_id,
+        name: row.child_name,
+        birthDate: row.date_of_birth,
+        age: row.age
+      },
+      parent: {
+        id: row.parent_id,
+        name: row.parent_name,
+        phone: row.parent_phone,
+        email: row.parent_email
+      },
+      nursery: {
+        id: row.nursery_id,
+        name: row.nursery_name
+      }
+    }));
+
+    res.json({
+      success: true,
+      count: enrollments.length,
+      enrollments
+    });
+
+  } catch (error) {
+    console.error('Error fetching all enrollments:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch enrollments' 
+    });
+  }
 });
 
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📝 API endpoints available at http://localhost:${PORT}/api`);
-});
+  console.log(`📝 API endpoints available at http://localhost:${PORT}/api`);});
