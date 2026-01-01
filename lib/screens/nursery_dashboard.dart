@@ -468,10 +468,6 @@ class _NurseryDashboardState extends State<NurseryDashboard> {
                           );
                         },
                       ),
-                      const _QuickAction(
-                          icon: Icons.event, label: 'Activités & horaires'),
-                      const _QuickAction(
-                          icon: Icons.people, label: 'Parents & équipe'),
                       _QuickAction(
                         icon: Icons.bar_chart,
                         label: 'Performance',

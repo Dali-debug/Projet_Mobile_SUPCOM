@@ -325,11 +325,15 @@ class _NurseryPerformanceScreenState extends State<NurseryPerformanceScreen> {
     
     // Parse rating safely (it might be string or number) - keep as double
     final ratingValue = review['rating'];
+    print('🔍 DEBUG Rating: $ratingValue (type: ${ratingValue.runtimeType})');
+    
     final ratingDouble = ratingValue is double
         ? ratingValue
         : (ratingValue is int 
             ? (ratingValue as int).toDouble()
             : double.tryParse(ratingValue.toString()) ?? 0.0);
+    
+    print('🔍 DEBUG Parsed Double: $ratingDouble');
     
     // For display, show the full rating (not just the integer part)
     final ratingInt = ratingDouble.floor();

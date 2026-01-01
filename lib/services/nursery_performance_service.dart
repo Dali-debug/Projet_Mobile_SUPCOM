@@ -18,12 +18,16 @@ class NurseryPerformanceService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         
+        print('📊 FULL API Response: ${jsonEncode(data)}');
+        
         if (data['success'] == true || data['reviews'] != null) {
           final List<dynamic> reviews = data['reviews'] ?? [];
           
+          print('📊 Reviews from API: ${jsonEncode(reviews)}');
+          
           // Normalize review data
           final normalizedReviews = reviews.map((review) {
-            return {
+            final normalized = {
               'id': review['id'],
               'rating': review['rating'],
               'comment': review['comment'],
@@ -31,6 +35,8 @@ class NurseryPerformanceService {
               'parentName': review['parent_name'] ?? review['parentName'],
               'parentId': review['parent_id'] ?? review['parentId'],
             };
+            print('📊 Normalized review: ${jsonEncode(normalized)}');
+            return normalized;
           }).toList();
           
           // Calculate average rating
@@ -57,9 +63,16 @@ class NurseryPerformanceService {
           
           for (var review in normalizedReviews) {
             final rating = review['rating'];
-            final ratingValue = rating is double
-                ? rating.toInt()
-                : (rating is int ? rating : int.tryParse(rating.toString()) ?? 0);
+            // Parse rating as double first, then convert to int
+            final ratingDouble = rating is double
+                ? rating
+                : (rating is int 
+                    ? (rating as int).toDouble()
+                    : double.tryParse(rating.toString()) ?? 0.0);
+            final ratingValue = ratingDouble.toInt();
+            
+            print('📊 Distribution - Rating: $rating -> Double: $ratingDouble -> Int: $ratingValue');
+            
             if (ratingValue >= 1 && ratingValue <= 5) {
               ratingDistribution[ratingValue] = (ratingDistribution[ratingValue] ?? 0) + 1;
             }
