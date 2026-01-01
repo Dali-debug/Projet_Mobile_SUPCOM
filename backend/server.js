@@ -542,13 +542,13 @@ app.post('/api/enrollments', async (req, res) => {
     const birthDateObj = new Date(birthDate);
     const age = Math.floor((new Date() - birthDateObj) / (365.25 * 24 * 60 * 60 * 1000));
 
-    // 3. Create child
+    // 3. Create child with medical notes
     const childQuery = `
-      INSERT INTO children (parent_id, name, age, date_of_birth)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO children (parent_id, name, age, date_of_birth, medical_notes)
+      VALUES ($1, $2, $3, $4, $5)
       RETURNING id
     `;
-    const childResult = await client.query(childQuery, [parentIdToUse, childName, age, birthDate]);
+    const childResult = await client.query(childQuery, [parentIdToUse, childName, age, birthDate, notes || null]);
     const childId = childResult.rows[0].id;
 
     // 4. Create enrollment
