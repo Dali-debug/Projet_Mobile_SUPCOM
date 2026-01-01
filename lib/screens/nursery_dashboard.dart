@@ -6,6 +6,7 @@ import '../widgets/app_drawer.dart';
 import '../services/nursery_dashboard_service.dart';
 import '../services/enrollment_service_web.dart';
 import 'chat_list_screen.dart';
+import 'manage_enrolled_screen.dart';
 
 class NurseryDashboard extends StatefulWidget {
   const NurseryDashboard({super.key});
@@ -356,7 +357,15 @@ class _NurseryDashboardState extends State<NurseryDashboard> {
                     runSpacing: 12,
                     children: [
                       _QuickAction(
-                          icon: Icons.group, label: 'Gérer les inscrits'),
+                          icon: Icons.group,
+                          label: 'Gérer les inscrits',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const ManageEnrolledScreen(),
+                            ),
+                          )),
                       _QuickAction(
                           icon: Icons.event, label: 'Activités & horaires'),
                       _QuickAction(
@@ -654,11 +663,16 @@ class _ProgramRow extends StatelessWidget {
 class _QuickAction extends StatelessWidget {
   final IconData icon;
   final String label;
-  const _QuickAction({required this.icon, required this.label});
+  final VoidCallback? onTap;
+  const _QuickAction({
+    required this.icon,
+    required this.label,
+    this.onTap,
+  });
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () {},
+      onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
         width: 140,

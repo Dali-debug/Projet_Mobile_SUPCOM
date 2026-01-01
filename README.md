@@ -101,6 +101,72 @@ lib/
 - Nursery search and filtering
 - Nursery details with ratings and reviews
 - Nursery dashboard for managing enrollment
+- **Manage Enrolled Children** - View all parents and their children enrolled in the nursery
+
+### Nursery Management Features
+
+#### 1. Manage Enrolled Children Dashboard
+
+**Location**: Nursery Dashboard → Actions rapides → "Gérer les inscrits"
+
+This feature allows nursery staff to view and manage all enrolled children and their parent information in one centralized dashboard.
+
+**Features**:
+- View all parents enrolled in the nursery with their contact information
+- See all children associated with each parent
+- Display enrollment status (Active, Pending, Completed, Cancelled)
+- View child details: name, age, birth date
+- See enrollment dates for tracking
+- Real-time count of total parents and children
+- Pull-to-refresh functionality
+
+**Backend Endpoint**:
+```
+GET /api/nurseries/:nurseryId/enrolled-children
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "nurseryId": "uuid",
+  "totalParents": 5,
+  "totalChildren": 8,
+  "parents": [
+    {
+      "parentId": "uuid",
+      "parentName": "Parent Name",
+      "parentEmail": "parent@example.com",
+      "parentPhone": "+216XX000000",
+      "children": [
+        {
+          "childId": "uuid",
+          "childName": "Child Name",
+          "age": 3,
+          "birthDate": "2021-05-15",
+          "enrollmentId": "uuid",
+          "enrollmentStatus": "active",
+          "startDate": "2024-01-01",
+          "enrollmentDate": "2024-01-01T10:30:00Z"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Files Involved**:
+- **Backend**: `backend/server.js` - `/api/nurseries/:nurseryId/enrolled-children` endpoint
+- **Frontend Service**: `lib/services/enrolled_children_service_web.dart` - Service for API communication
+- **Frontend UI**: `lib/screens/manage_enrolled_screen.dart` - Display component
+- **Integration**: `lib/screens/nursery_dashboard.dart` - Quick action button
+
+**UI Components**:
+- Summary cards showing total parents and children count
+- Parent cards with contact information
+- Child items with enrollment status badges
+- Color-coded status indicators
+- Responsive design for mobile and web
 
 ## State Management
 
