@@ -218,4 +218,50 @@ class NurseryServiceWeb {
       return null;
     }
   }
+
+  // Get nurseries by owner
+  Future<List<Nursery>> getNurseriesByOwner(String ownerId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/nurseries/owner/$ownerId'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          final List<dynamic> nurseriesData = data['nurseries'];
+          return nurseriesData.map((nurseryData) {
+            return Nursery(
+              id: nurseryData['id'],
+              ownerId: nurseryData['ownerId'],
+              name: nurseryData['name'],
+              description: nurseryData['description'] ?? '',
+              address: nurseryData['address'],
+              city: nurseryData['city'],
+              postalCode: nurseryData['postalCode'] ?? '',
+              phone: nurseryData['phone'] ?? '',
+              email: nurseryData['email'] ?? '',
+              hours: nurseryData['hours'] ?? '',
+              price: _parseDouble(nurseryData['price']),
+              totalSpots: _parseInt(nurseryData['totalSpots']),
+              availableSpots: _parseInt(nurseryData['availableSpots']),
+              ageRange: nurseryData['ageRange'] ?? '',
+              rating: _parseDouble(nurseryData['rating']),
+              photo: nurseryData['photoUrl'] ?? '',
+              facilities: List<String>.from(nurseryData['facilities'] ?? []),
+              activities: List<String>.from(nurseryData['activities'] ?? []),
+              distance: 0.0,
+              reviewCount: _parseInt(nurseryData['reviewCount']),
+              staff: _parseInt(nurseryData['staff']),
+            );
+          }).toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      print('Error getting nurseries by owner: $e');
+      return [];
+    }
+  }
 }

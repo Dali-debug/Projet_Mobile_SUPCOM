@@ -499,6 +499,68 @@ app.get('/api/nurseries/:id', async (req, res) => {
   }
 });
 
+// Get nurseries by owner ID
+app.get('/api/nurseries/owner/:ownerId', async (req, res) => {
+  const { ownerId } = req.params;
+
+  try {
+    const query = `
+      SELECT n.id, n.owner_id, n.name, n.description, n.address, n.city,
+             n.postal_code, n.phone, n.email, n.hours, n.price_per_month,
+             n.total_spots, n.available_spots, n.age_range, n.rating, n.photo_url,
+             n.staff_count, n.review_count,
+             COALESCE(
+               (SELECT json_agg(facility_name) FROM nursery_facilities WHERE nursery_id = n.id),
+               '[]'
+             ) as facilities,
+             COALESCE(
+               (SELECT json_agg(activity_name) FROM nursery_activities WHERE nursery_id = n.id),
+               '[]'
+             ) as activities
+      FROM nurseries n
+      WHERE n.owner_id = $1
+      ORDER BY n.created_at DESC
+    `;
+    
+    const result = await pool.query(query, [ownerId]);
+
+    const nurseries = result.rows.map(row => ({
+      id: row.id,
+      ownerId: row.owner_id,
+      name: row.name,
+      description: row.description,
+      address: row.address,
+      city: row.city,
+      postalCode: row.postal_code,
+      phone: row.phone,
+      email: row.email,
+      hours: row.hours,
+      price: row.price_per_month,
+      totalSpots: row.total_spots,
+      availableSpots: row.available_spots,
+      ageRange: row.age_range,
+      rating: row.rating,
+      photoUrl: row.photo_url,
+      staff: row.staff_count || 0,
+      reviewCount: row.review_count || 0,
+      facilities: row.facilities,
+      activities: row.activities
+    }));
+
+    res.json({
+      success: true,
+      nurseries
+    });
+
+  } catch (error) {
+    console.error('Error fetching nurseries by owner:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch nurseries by owner' 
+    });
+  }
+});
+
 // ============== ENROLLMENT ENDPOINTS ==============
 
 // Create child and enrollment

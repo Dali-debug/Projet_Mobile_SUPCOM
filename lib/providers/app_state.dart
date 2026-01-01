@@ -83,12 +83,23 @@ class AppState extends ChangeNotifier {
       await loadParentData();
     } else {
       // Check if nursery owner has nurseries
-      final nurseries = await _nurseryService.getNurseriesByOwner(user.id);
-      if (nurseries.isEmpty) {
+      try {
+        print('🔍 Checking nurseries for owner: ${user.id}');
+        final nurseries = await nurseryService.getNurseriesByOwner(user.id);
+        print('📊 Found ${nurseries.length} nurseries');
+
+        if (nurseries.isEmpty) {
+          print('⚠️ No nurseries found, redirecting to setup');
+          _currentScreen = ScreenType.nurserySetup;
+        } else {
+          print('✅ Nurseries found, redirecting to dashboard');
+          _nurseries = nurseries;
+          _currentScreen = ScreenType.nurseryDashboard;
+        }
+      } catch (e) {
+        print('❌ Error checking nurseries: $e');
+        // On error, assume no nurseries and go to setup
         _currentScreen = ScreenType.nurserySetup;
-      } else {
-        _nurseries = nurseries;
-        _currentScreen = ScreenType.nurseryDashboard;
       }
     }
     notifyListeners();
@@ -113,7 +124,7 @@ class AppState extends ChangeNotifier {
 
     try {
       setLoading(true);
-      _nurseries = await _nurseryService.getNurseriesByOwner(_user!.id);
+      _nurseries = await nurseryService.getNurseriesByOwner(_user!.id);
       notifyListeners();
     } catch (e) {
       setError('Erreur lors du chargement des garderies: $e');
