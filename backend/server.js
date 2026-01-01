@@ -713,7 +713,57 @@ app.get('/api/enrollments', async (req, res) => {
   }
 });
 
+// Update enrollment status
+app.patch('/api/enrollments/:enrollmentId/status', async (req, res) => {
+  const { enrollmentId } = req.params;
+  const { status } = req.body;
+
+  // Validate status
+  const validStatuses = ['pending', 'active', 'completed', 'cancelled'];
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid status. Must be one of: ' + validStatuses.join(', ')
+    });
+  }
+
+  try {
+    const query = `
+      UPDATE enrollments
+      SET status = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+      RETURNING id, status, updated_at
+    `;
+    
+    const result = await pool.query(query, [status, enrollmentId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Enrollment not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      enrollment: {
+        id: result.rows[0].id,
+        status: result.rows[0].status,
+        updatedAt: result.rows[0].updated_at
+      }
+    });
+
+  } catch (error) {
+    console.error('Error updating enrollment status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update enrollment status'
+    });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📝 API endpoints available at http://localhost:${PORT}/api`);});
+  console.log(`📝 API endpoints available at http://localhost:${PORT}/api`);
+});

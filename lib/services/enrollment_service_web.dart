@@ -64,4 +64,45 @@ class EnrollmentServiceWeb {
       return [];
     }
   }
+
+  // Get all enrollments
+  Future<List<Map<String, dynamic>>> getAllEnrollments() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/enrollments'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          return List<Map<String, dynamic>>.from(data['enrollments']);
+        }
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching all enrollments: $e');
+      return [];
+    }
+  }
+
+  // Update enrollment status (accept/reject)
+  Future<bool> updateEnrollmentStatus(
+      String enrollmentId, String status) async {
+    try {
+      final response = await http.patch(
+        Uri.parse('$baseUrl/enrollments/$enrollmentId/status'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'status': status}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['success'] == true;
+      }
+      return false;
+    } catch (e) {
+      print('Error updating enrollment status: $e');
+      return false;
+    }
+  }
 }

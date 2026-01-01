@@ -4,6 +4,7 @@ import '../providers/app_state.dart';
 import '../models/user.dart';
 import '../widgets/app_drawer.dart';
 import 'chat_list_screen.dart';
+import 'parent_enrollments_screen.dart';
 
 class ParentDashboard extends StatelessWidget {
   const ParentDashboard({super.key});
@@ -195,6 +196,44 @@ class ParentDashboard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Quick action button - Mes inscriptions
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const ParentEnrollmentsScreen(),
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: const Color(0xFF00BFA5),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 2,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(Icons.assignment_outlined),
+                              SizedBox(width: 8),
+                              Text(
+                                'Mes inscriptions',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
                         // Mes enfants
                         const Text(
                           'Mes enfants',
