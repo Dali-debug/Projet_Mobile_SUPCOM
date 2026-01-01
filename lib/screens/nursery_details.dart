@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../services/review_service.dart';
+import '../services/review_service_web.dart';
 import '../models/review.dart';
+import '../models/nursery.dart';
 import 'enrollment_screen.dart';
 
 class NurseryDetails extends StatefulWidget {
@@ -513,7 +515,7 @@ class _NurseryDetailsState extends State<NurseryDetails> {
         ],
       ),
 
-      // Bottom Button
+      // Bottom Buttons
       bottomNavigationBar: SafeArea(
         child: Container(
           padding: const EdgeInsets.all(16),
@@ -527,48 +529,173 @@ class _NurseryDetailsState extends State<NurseryDetails> {
               ),
             ],
           ),
-          child: Container(
-            height: 50,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF00BFA5), Color(0xFF00ACC1)],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => EnrollmentScreen(
-                      nurseryId: nursery.id,
-                      nurseryName: nursery.name,
-                      price: nursery.price,
+          child: Row(
+            children: [
+              // Bouton "Laisser un avis"
+              Expanded(
+                child: Container(
+                  height: 50,
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: const Color(0xFF00BFA5),
+                      width: 2,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ElevatedButton(
+                    onPressed: () => _showLeaveReviewDialog(nursery),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      shadowColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Laisser un avis',
+                      style: TextStyle(
+                        color: Color(0xFF00BFA5),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                shadowColor: Colors.transparent,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Text(
-                'Inscrire mon enfant',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 0.5,
+              const SizedBox(width: 12),
+              // Bouton "Inscire mon enfant"
+              Expanded(
+                child: Container(
+                  height: 50,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF00BFA5), Color(0xFF00ACC1)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EnrollmentScreen(
+                            nurseryId: nursery.id,
+                            nurseryName: nursery.name,
+                            price: nursery.price,
+                          ),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Inscrire mon enfant',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showLeaveReviewDialog(Nursery nursery) async {
+    final appState = Provider.of<AppState>(context, listen: false);
+    final parentId = appState.user?.id;
+
+    if (parentId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Vous devez être connecté pour laisser un avis')),
+      );
+      return;
+    }
+
+    double rating = 5.0;
+    final commentController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Laisser un avis - ${nursery.name}'),
+        content: SingleChildScrollView(
+          child: StatefulBuilder(
+            builder: (dialogContext, setState) => Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Notez la garderie (0.5 - 5.0)'),
+                Slider(
+                  value: rating,
+                  min: 0,
+                  max: 5,
+                  divisions: 10,
+                  label: rating.toStringAsFixed(1),
+                  onChanged: (v) {
+                    setState(() => rating = v);
+                  },
+                ),
+                TextField(
+                  controller: commentController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                      hintText: 'Votre commentaire (optionnel)'),
+                ),
+              ],
             ),
           ),
         ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annuler')),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final res = await ReviewServiceWeb.postReview(
+                nurseryId: nursery.id,
+                parentId: parentId,
+                rating: double.parse(rating.toStringAsFixed(1)),
+                comment: commentController.text.isNotEmpty
+                    ? commentController.text
+                    : null,
+              );
+
+              if (res['success'] == true) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Merci pour votre avis'),
+                        backgroundColor: Colors.green),
+                  );
+                  _loadReviews();
+                }
+              } else {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                        content: Text(
+                            'Erreur: ${res['error'] ?? 'Impossible d\'envoyer l\'avis'}')),
+                  );
+                }
+              }
+            },
+            child: const Text('Envoyer'),
+          ),
+        ],
       ),
     );
   }
