@@ -338,10 +338,9 @@ class _NurseryFinancialTrackingScreenState
         ],
       ),
       child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: statusColor.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
@@ -349,7 +348,7 @@ class _NurseryFinancialTrackingScreenState
           child: Icon(
             Icons.child_care,
             color: statusColor,
-            size: 28,
+            size: 22,
           ),
         ),
         title: Text(
@@ -370,16 +369,17 @@ class _NurseryFinancialTrackingScreenState
                 fontSize: 13,
               ),
             ),
-            const SizedBox(height: 1),
             Text(
               payment['parent_email'] ?? '',
               style: TextStyle(
                 color: Colors.grey[500],
-                fontSize: 12,
+                fontSize: 11,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             if (isPaid && payment['payment_date'] != null) ...[
-              const SizedBox(height: 2),
+              const SizedBox(height: 1),
               Row(
                 children: [
                   Icon(Icons.access_time, size: 12, color: Colors.grey[500]),
@@ -397,11 +397,12 @@ class _NurseryFinancialTrackingScreenState
           ],
         ),
         trailing: Column(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: statusColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20),
@@ -409,25 +410,25 @@ class _NurseryFinancialTrackingScreenState
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(statusIcon, color: statusColor, size: 14),
-                  const SizedBox(width: 4),
+                  Icon(statusIcon, color: statusColor, size: 11),
+                  const SizedBox(width: 3),
                   Text(
                     statusText,
                     style: TextStyle(
                       color: statusColor,
                       fontWeight: FontWeight.bold,
-                      fontSize: 12,
+                      fontSize: 10,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
               _paymentService.formatAmount(payment['amount']),
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: 16,
+                fontSize: 14,
                 color: statusColor,
               ),
             ),
