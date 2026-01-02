@@ -136,7 +136,10 @@ class _ParentPaymentScreenState extends State<ParentPaymentScreen> {
                         style: TextStyle(color: Colors.grey[600]),
                       ),
                       Text(
-                        'Mois: ${_paymentService.getMonthName(payment['payment_month'])} ${payment['payment_year']}',
+                        payment['payment_month'] != null &&
+                                payment['payment_year'] != null
+                            ? 'Mois: ${_paymentService.getMonthName(payment['payment_month'])} ${payment['payment_year']}'
+                            : 'Mois: Date non définie',
                         style: TextStyle(color: Colors.grey[600]),
                       ),
                       const Divider(height: 20),
@@ -452,7 +455,10 @@ class _ParentPaymentScreenState extends State<ParentPaymentScreen> {
               Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
               const SizedBox(width: 8),
               Text(
-                '${_paymentService.getMonthName(payment['payment_month'])} ${payment['payment_year']}',
+                payment['payment_month'] != null &&
+                        payment['payment_year'] != null
+                    ? '${_paymentService.getMonthName(payment['payment_month'])} ${payment['payment_year']}'
+                    : 'Date non définie',
                 style: TextStyle(color: Colors.grey[600]),
               ),
             ],

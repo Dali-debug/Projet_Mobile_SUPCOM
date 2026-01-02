@@ -338,7 +338,8 @@ class _NurseryFinancialTrackingScreenState
         ],
       ),
       child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         leading: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -361,7 +362,7 @@ class _NurseryFinancialTrackingScreenState
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
               'Parent: ${payment['parent_name'] ?? 'N/A'}',
               style: TextStyle(
@@ -369,7 +370,7 @@ class _NurseryFinancialTrackingScreenState
                 fontSize: 13,
               ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 1),
             Text(
               payment['parent_email'] ?? '',
               style: TextStyle(
@@ -378,7 +379,7 @@ class _NurseryFinancialTrackingScreenState
               ),
             ),
             if (isPaid && payment['payment_date'] != null) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Row(
                 children: [
                   Icon(Icons.access_time, size: 12, color: Colors.grey[500]),

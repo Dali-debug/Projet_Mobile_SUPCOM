@@ -1799,6 +1799,8 @@ app.get('/api/payments/parent/:parentId/status', async (req, res) => {
         p.amount,
         p.payment_status,
         p.payment_date,
+        p.payment_month,
+        p.payment_year,
         c.name as child_name,
         n.name as nursery_name,
         n.id as nursery_id
@@ -1852,13 +1854,13 @@ app.post('/api/payments/process', async (req, res) => {
 
     // Get payment record
     const paymentQuery = `
-      SELECT p.*, e.parent_id, e.child_id, e.nursery_id
+      SELECT p.*, c.parent_id, e.child_id, e.nursery_id, n.owner_id
       FROM payments p
       JOIN enrollments e ON p.enrollment_id = e.id
+      JOIN children c ON e.child_id = c.id
+      JOIN nurseries n ON e.nursery_id = n.id
       WHERE p.enrollment_id = $1 
         AND p.payment_status = 'unpaid'
-        AND p.payment_month = EXTRACT(MONTH FROM CURRENT_DATE)
-        AND p.payment_year = EXTRACT(YEAR FROM CURRENT_DATE)
     `;
     const paymentResult = await client.query(paymentQuery, [enrollmentId]);
 
@@ -1904,7 +1906,7 @@ app.post('/api/payments/process', async (req, res) => {
 
     const notificationMessage = `Nouveau paiement reçu pour l'inscription #${enrollmentId}`;
     await client.query(notificationQuery, [
-      payment.nursery_id,
+      payment.owner_id,
       'Paiement reçu',
       notificationMessage,
       'payment',
@@ -1943,6 +1945,8 @@ app.get('/api/payments/nursery/:nurseryId', async (req, res) => {
         p.amount,
         p.payment_status,
         p.payment_date,
+        p.payment_month,
+        p.payment_year,
         p.card_last_digits,
         c.name as child_name,
         u.name as parent_name,
@@ -1984,6 +1988,8 @@ app.get('/api/payments/owner/:ownerId', async (req, res) => {
         p.amount,
         p.payment_status,
         p.payment_date,
+        p.payment_month,
+        p.payment_year,
         p.card_last_digits,
         c.name as child_name,
         u.name as parent_name,

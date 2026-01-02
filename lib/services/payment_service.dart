@@ -40,8 +40,9 @@ class PaymentService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'enrollmentId': enrollmentId,
-          'cardLastDigits': lastDigits,
+          'cardNumber': cardNumber,
           'expiryDate': expiryDate,
+          'cvv': cvv,
         }),
       );
 
