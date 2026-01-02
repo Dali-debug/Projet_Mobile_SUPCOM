@@ -30,6 +30,24 @@ class _NurseryDashboardState extends State<NurseryDashboard> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadDashboardData());
+    
+    // Listen for updates from other screens (e.g., ManageEnrolledScreen)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<AppState>(context, listen: false).addListener(_onAppStateChange);
+    });
+  }
+  
+  void _onAppStateChange() {
+    // Reload dashboard data when AppState changes (e.g., enrollment accepted)
+    if (mounted) {
+      _loadDashboardData();
+    }
+  }
+  
+  @override
+  void dispose() {
+    Provider.of<AppState>(context, listen: false).removeListener(_onAppStateChange);
+    super.dispose();
   }
 
   Future<void> _loadDashboardData() async {

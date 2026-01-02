@@ -442,6 +442,11 @@ class _ManageEnrolledScreenState extends State<ManageEnrolledScreen> {
         // Reload data
         setState(() => _isLoading = true);
         _loadEnrolledChildren();
+        
+        // Notify AppState to refresh dashboard
+        if (mounted) {
+          Provider.of<AppState>(context, listen: false).notifyListeners();
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
