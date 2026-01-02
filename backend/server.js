@@ -1783,27 +1783,23 @@ app.delete('/api/reviews/:reviewId', async (req, res) => {
 });
 
 // ============================================================================
-// PAYMENT ENDPOINTS
+// PAYMENT ENDPOINTS (SIMPLIFIED - ONE-TIME PAYMENT PER ENROLLMENT)
 // ============================================================================
 
-// Get payment status for a parent (current month)
+// Get payment status for a parent
 app.get('/api/payments/parent/:parentId/status', async (req, res) => {
   try {
     const { parentId } = req.params;
-    const currentDate = new Date();
-    const currentMonth = currentDate.getMonth() + 1;
-    const currentYear = currentDate.getFullYear();
 
-    // Get all pending payments for current month
+    // Get all payments for this parent
     const query = `
       SELECT 
         p.id,
         p.enrollment_id,
         p.amount,
-        p.payment_month,
-        p.payment_year,
         p.payment_status,
-        c.first_name || ' ' || c.last_name as child_name,
+        p.payment_date,
+        c.name as child_name,
         n.name as nursery_name,
         n.id as nursery_id
       FROM payments p
@@ -1811,20 +1807,22 @@ app.get('/api/payments/parent/:parentId/status', async (req, res) => {
       JOIN children c ON e.child_id = c.id
       JOIN nurseries n ON p.nursery_id = n.id
       WHERE p.parent_id = $1 
-        AND p.payment_month = $2 
-        AND p.payment_year = $3
-        AND p.payment_status = 'unpaid'
-        AND e.status = 'accepted'
-      ORDER BY c.first_name
+        AND e.status IN ('accepted', 'active')
+      ORDER BY c.name
     `;
 
-    const result = await pool.query(query, [parentId, currentMonth, currentYear]);
+    const result = await pool.query(query, [parentId]);
+
+    // Séparer les paiements en payés et non payés
+    const pendingPayments = result.rows.filter(p => p.payment_status === 'unpaid');
+    const paidPayments = result.rows.filter(p => p.payment_status === 'paid');
 
     res.json({
       success: true,
-      pendingPayments: result.rows,
-      currentMonth,
-      currentYear
+      pendingPayments,
+      paidPayments,
+      totalPending: pendingPayments.length,
+      totalPaid: paidPayments.length
     });
 
   } catch (error) {
@@ -1934,14 +1932,10 @@ app.post('/api/payments/process', async (req, res) => {
   }
 });
 
-// Get all payments for a nursery (with filters)
+// Get all payments for a nursery
 app.get('/api/payments/nursery/:nurseryId', async (req, res) => {
   try {
     const { nurseryId } = req.params;
-    const { month, year } = req.query;
-
-    const currentMonth = month ? parseInt(month) : new Date().getMonth() + 1;
-    const currentYear = year ? parseInt(year) : new Date().getFullYear();
 
     const query = `
       SELECT 
@@ -1949,31 +1943,25 @@ app.get('/api/payments/nursery/:nurseryId', async (req, res) => {
         p.amount,
         p.payment_status,
         p.payment_date,
-        p.payment_month,
-        p.payment_year,
         p.card_last_digits,
-        c.first_name || ' ' || c.last_name as child_name,
-        par.first_name || ' ' || par.last_name as parent_name,
-        par.email as parent_email,
-        par.phone as parent_phone
+        c.name as child_name,
+        u.name as parent_name,
+        u.email as parent_email,
+        u.phone as parent_phone
       FROM payments p
       JOIN enrollments e ON p.enrollment_id = e.id
       JOIN children c ON e.child_id = c.id
-      JOIN parents par ON e.parent_id = par.id
+      JOIN users u ON p.parent_id = u.id
       WHERE p.nursery_id = $1 
-        AND p.payment_month = $2 
-        AND p.payment_year = $3
-        AND e.status = 'accepted'
-      ORDER BY p.payment_status DESC, c.first_name
+        AND e.status IN ('accepted', 'active')
+      ORDER BY p.payment_status, c.name
     `;
 
-    const result = await pool.query(query, [nurseryId, currentMonth, currentYear]);
+    const result = await pool.query(query, [nurseryId]);
 
     res.json({
       success: true,
-      payments: result.rows,
-      month: currentMonth,
-      year: currentYear
+      payments: result.rows
     });
 
   } catch (error) {
@@ -1985,14 +1973,52 @@ app.get('/api/payments/nursery/:nurseryId', async (req, res) => {
   }
 });
 
+// Get all payments for a nursery by owner ID
+app.get('/api/payments/owner/:ownerId', async (req, res) => {
+  try {
+    const { ownerId } = req.params;
+
+    const query = `
+      SELECT 
+        p.id,
+        p.amount,
+        p.payment_status,
+        p.payment_date,
+        p.card_last_digits,
+        c.name as child_name,
+        u.name as parent_name,
+        u.email as parent_email,
+        u.phone as parent_phone
+      FROM payments p
+      JOIN nurseries n ON p.nursery_id = n.id
+      JOIN enrollments e ON p.enrollment_id = e.id
+      JOIN children c ON e.child_id = c.id
+      JOIN users u ON p.parent_id = u.id
+      WHERE n.owner_id = $1 
+        AND e.status IN ('accepted', 'active')
+      ORDER BY p.payment_status, c.name
+    `;
+
+    const result = await pool.query(query, [ownerId]);
+
+    res.json({
+      success: true,
+      payments: result.rows
+    });
+
+  } catch (error) {
+    console.error('Error getting owner payments:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get payments'
+    });
+  }
+});
+
 // Get financial statistics for nursery
 app.get('/api/payments/nursery/:nurseryId/stats', async (req, res) => {
   try {
     const { nurseryId } = req.params;
-    const { month, year } = req.query;
-
-    const currentMonth = month ? parseInt(month) : new Date().getMonth() + 1;
-    const currentYear = year ? parseInt(year) : new Date().getFullYear();
 
     const query = `
       SELECT 
@@ -2005,12 +2031,10 @@ app.get('/api/payments/nursery/:nurseryId/stats', async (req, res) => {
       FROM payments p
       JOIN enrollments e ON p.enrollment_id = e.id
       WHERE p.nursery_id = $1 
-        AND p.payment_month = $2 
-        AND p.payment_year = $3
-        AND e.status = 'accepted'
+        AND e.status IN ('accepted', 'active')
     `;
 
-    const result = await pool.query(query, [nurseryId, currentMonth, currentYear]);
+    const result = await pool.query(query, [nurseryId]);
     const stats = result.rows[0];
 
     const totalExpected = parseFloat(stats.total_expected) || 0;
@@ -2029,9 +2053,7 @@ app.get('/api/payments/nursery/:nurseryId/stats', async (req, res) => {
         paid_count: parseInt(stats.paid_count) || 0,
         unpaid_count: parseInt(stats.unpaid_count) || 0,
         payment_percentage: paymentPercentage
-      },
-      month: currentMonth,
-      year: currentYear
+      }
     });
 
   } catch (error) {
@@ -2043,11 +2065,62 @@ app.get('/api/payments/nursery/:nurseryId/stats', async (req, res) => {
   }
 });
 
+// Get financial statistics for nursery by owner ID
+app.get('/api/payments/owner/:ownerId/stats', async (req, res) => {
+  try {
+    const { ownerId } = req.params;
+
+    const query = `
+      SELECT 
+        COUNT(*) as total_enrollments,
+        SUM(p.amount) as total_expected,
+        SUM(CASE WHEN p.payment_status = 'paid' THEN p.amount ELSE 0 END) as total_received,
+        SUM(CASE WHEN p.payment_status = 'unpaid' THEN p.amount ELSE 0 END) as total_pending,
+        COUNT(CASE WHEN p.payment_status = 'paid' THEN 1 END) as paid_count,
+        COUNT(CASE WHEN p.payment_status = 'unpaid' THEN 1 END) as unpaid_count
+      FROM payments p
+      JOIN nurseries n ON p.nursery_id = n.id
+      JOIN enrollments e ON p.enrollment_id = e.id
+      WHERE n.owner_id = $1 
+        AND e.status IN ('accepted', 'active')
+    `;
+
+    const result = await pool.query(query, [ownerId]);
+    const stats = result.rows[0];
+
+    const totalExpected = parseFloat(stats.total_expected) || 0;
+    const totalReceived = parseFloat(stats.total_received) || 0;
+    const paymentPercentage = totalExpected > 0 
+      ? (totalReceived / totalExpected) * 100 
+      : 0;
+
+    res.json({
+      success: true,
+      stats: {
+        total_enrollments: parseInt(stats.total_enrollments) || 0,
+        total_expected: totalExpected,
+        total_received: totalReceived,
+        total_pending: parseFloat(stats.total_pending) || 0,
+        paid_count: parseInt(stats.paid_count) || 0,
+        unpaid_count: parseInt(stats.unpaid_count) || 0,
+        payment_percentage: paymentPercentage
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting owner payment stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get statistics'
+    });
+  }
+});
+
 // Get payment history for a parent
 app.get('/api/payments/parent/:parentId/history', async (req, res) => {
   try {
     const { parentId } = req.params;
-    const { limit = 12 } = req.query;
+    const { limit = 100 } = req.query;
 
     const query = `
       SELECT 
@@ -2055,17 +2128,15 @@ app.get('/api/payments/parent/:parentId/history', async (req, res) => {
         p.amount,
         p.payment_status,
         p.payment_date,
-        p.payment_month,
-        p.payment_year,
         p.card_last_digits,
-        c.first_name || ' ' || c.last_name as child_name,
+        c.name as child_name,
         n.name as nursery_name
       FROM payments p
       JOIN enrollments e ON p.enrollment_id = e.id
       JOIN children c ON e.child_id = c.id
       JOIN nurseries n ON p.nursery_id = n.id
       WHERE p.parent_id = $1
-      ORDER BY p.payment_year DESC, p.payment_month DESC
+      ORDER BY p.payment_date DESC
       LIMIT $2
     `;
 
@@ -2082,35 +2153,6 @@ app.get('/api/payments/parent/:parentId/history', async (req, res) => {
       success: false,
       error: 'Failed to get payment history'
     });
-  }
-});
-
-// Generate monthly payments (to be called by a cron job or manually)
-app.post('/api/payments/generate-monthly', async (req, res) => {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-
-    // Call the stored procedure to generate payments
-    const result = await client.query('SELECT create_monthly_payments()');
-
-    await client.query('COMMIT');
-
-    res.json({
-      success: true,
-      message: 'Monthly payments generated successfully',
-      result: result.rows[0]
-    });
-
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Error generating monthly payments:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to generate monthly payments'
-    });
-  } finally {
-    client.release();
   }
 });
 

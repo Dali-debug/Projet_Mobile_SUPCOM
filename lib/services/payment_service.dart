@@ -8,7 +8,7 @@ class PaymentService {
   Future<Map<String, dynamic>> getPaymentStatus(String parentId) async {
     try {
       final response = await http.get(
-        Uri.parse('$_baseUrl/payments/parent/$parentId/current'),
+        Uri.parse('$_baseUrl/payments/parent/$parentId/status'),
       );
 
       if (response.statusCode == 200) {
@@ -58,19 +58,10 @@ class PaymentService {
   }
 
   // Obtenir tous les paiements pour une garderie (suivi financier)
-  Future<Map<String, dynamic>> getNurseryPayments(
-    String nurseryId, {
-    int? month,
-    int? year,
-  }) async {
+  Future<Map<String, dynamic>> getNurseryPayments(String nurseryId) async {
     try {
-      final currentDate = DateTime.now();
-      final queryMonth = month ?? currentDate.month;
-      final queryYear = year ?? currentDate.year;
-
       final response = await http.get(
-        Uri.parse(
-            '$_baseUrl/payments/nursery/$nurseryId?month=$queryMonth&year=$queryYear'),
+        Uri.parse('$_baseUrl/payments/nursery/$nurseryId'),
       );
 
       if (response.statusCode == 200) {
@@ -80,6 +71,24 @@ class PaymentService {
       }
     } catch (e) {
       print('Error getting nursery payments: $e');
+      throw Exception('Error: $e');
+    }
+  }
+
+  // Obtenir tous les paiements pour une garderie par owner ID
+  Future<Map<String, dynamic>> getOwnerPayments(String ownerId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/payments/owner/$ownerId'),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to load owner payments');
+      }
+    } catch (e) {
+      print('Error getting owner payments: $e');
       throw Exception('Error: $e');
     }
   }
@@ -105,18 +114,10 @@ class PaymentService {
 
   // Obtenir les statistiques financières de la garderie
   Future<Map<String, dynamic>> getNurseryFinancialStats(
-    String nurseryId, {
-    int? month,
-    int? year,
-  }) async {
+      String nurseryId) async {
     try {
-      final currentDate = DateTime.now();
-      final queryMonth = month ?? currentDate.month;
-      final queryYear = year ?? currentDate.year;
-
       final response = await http.get(
-        Uri.parse(
-            '$_baseUrl/payments/nursery/$nurseryId/stats?month=$queryMonth&year=$queryYear'),
+        Uri.parse('$_baseUrl/payments/nursery/$nurseryId/stats'),
       );
 
       if (response.statusCode == 200) {
@@ -130,21 +131,20 @@ class PaymentService {
     }
   }
 
-  // Générer les paiements du mois pour tous les enrollments acceptés
-  Future<Map<String, dynamic>> generateMonthlyPayments() async {
+  // Obtenir les statistiques financières par owner ID
+  Future<Map<String, dynamic>> getOwnerFinancialStats(String ownerId) async {
     try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/payments/generate-monthly'),
-        headers: {'Content-Type': 'application/json'},
+      final response = await http.get(
+        Uri.parse('$_baseUrl/payments/owner/$ownerId/stats'),
       );
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        throw Exception('Failed to generate monthly payments');
+        throw Exception('Failed to load owner financial stats');
       }
     } catch (e) {
-      print('Error generating monthly payments: $e');
+      print('Error getting owner financial stats: $e');
       throw Exception('Error: $e');
     }
   }

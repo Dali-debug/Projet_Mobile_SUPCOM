@@ -19,8 +19,6 @@ class _NurseryFinancialTrackingScreenState
   List<dynamic> _payments = [];
   Map<String, dynamic> _stats = {};
 
-  int _selectedMonth = DateTime.now().month;
-  int _selectedYear = DateTime.now().year;
   String _selectedFilter = 'tous'; // 'tous', 'paid', 'unpaid'
 
   @override
@@ -33,21 +31,13 @@ class _NurseryFinancialTrackingScreenState
     setState(() => _isLoading = true);
     try {
       final appState = Provider.of<AppState>(context, listen: false);
-      final nurseryId = appState.user?.id ?? '';
+      final ownerId = appState.user?.id ?? '';
 
-      // Charger les paiements
-      final paymentsResult = await _paymentService.getNurseryPayments(
-        nurseryId,
-        month: _selectedMonth,
-        year: _selectedYear,
-      );
+      // Charger les paiements par owner ID
+      final paymentsResult = await _paymentService.getOwnerPayments(ownerId);
 
-      // Charger les statistiques
-      final statsResult = await _paymentService.getNurseryFinancialStats(
-        nurseryId,
-        month: _selectedMonth,
-        year: _selectedYear,
-      );
+      // Charger les statistiques par owner ID
+      final statsResult = await _paymentService.getOwnerFinancialStats(ownerId);
 
       setState(() {
         _payments = paymentsResult['payments'] ?? [];
@@ -74,24 +64,6 @@ class _NurseryFinancialTrackingScreenState
       return _payments.where((p) => p['payment_status'] == 'paid').toList();
     } else {
       return _payments.where((p) => p['payment_status'] == 'unpaid').toList();
-    }
-  }
-
-  Future<void> _showMonthYearPicker() async {
-    final picked = await showDialog<Map<String, int>>(
-      context: context,
-      builder: (context) => _MonthYearPickerDialog(
-        selectedMonth: _selectedMonth,
-        selectedYear: _selectedYear,
-      ),
-    );
-
-    if (picked != null) {
-      setState(() {
-        _selectedMonth = picked['month']!;
-        _selectedYear = picked['year']!;
-      });
-      _loadFinancialData();
     }
   }
 
@@ -124,49 +96,9 @@ class _NurseryFinancialTrackingScreenState
             ),
             child: Column(
               children: [
-                // Sélection du mois
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: InkWell(
-                    onTap: _showMonthYearPicker,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.3),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.calendar_today,
-                              color: Colors.white, size: 20),
-                          const SizedBox(width: 12),
-                          Text(
-                            '${_paymentService.getMonthName(_selectedMonth)} $_selectedYear',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Icon(Icons.arrow_drop_down,
-                              color: Colors.white),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
                 // Statistiques
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
                       Expanded(
@@ -295,7 +227,7 @@ class _NurseryFinancialTrackingScreenState
                             const SizedBox(height: 8),
                             Text(
                               _selectedFilter == 'tous'
-                                  ? 'Aucune inscription pour ce mois'
+                                  ? 'Aucune inscription'
                                   : _selectedFilter == 'paid'
                                       ? 'Aucun paiement reçu'
                                       : 'Tous les paiements sont à jour',
@@ -512,122 +444,5 @@ class _NurseryFinancialTrackingScreenState
     } catch (e) {
       return dateString;
     }
-  }
-}
-
-// Dialog pour sélectionner mois et année
-class _MonthYearPickerDialog extends StatefulWidget {
-  final int selectedMonth;
-  final int selectedYear;
-
-  const _MonthYearPickerDialog({
-    required this.selectedMonth,
-    required this.selectedYear,
-  });
-
-  @override
-  State<_MonthYearPickerDialog> createState() => _MonthYearPickerDialogState();
-}
-
-class _MonthYearPickerDialogState extends State<_MonthYearPickerDialog> {
-  late int _month;
-  late int _year;
-
-  @override
-  void initState() {
-    super.initState();
-    _month = widget.selectedMonth;
-    _year = widget.selectedYear;
-  }
-
-  static const List<String> _monthNames = [
-    'Janvier',
-    'Février',
-    'Mars',
-    'Avril',
-    'Mai',
-    'Juin',
-    'Juillet',
-    'Août',
-    'Septembre',
-    'Octobre',
-    'Novembre',
-    'Décembre'
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final currentYear = DateTime.now().year;
-    final years = List.generate(5, (index) => currentYear - 2 + index);
-
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text('Sélectionner la période'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          DropdownButtonFormField<int>(
-            value: _month,
-            decoration: InputDecoration(
-              labelText: 'Mois',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            items: List.generate(12, (index) {
-              return DropdownMenuItem(
-                value: index + 1,
-                child: Text(_monthNames[index]),
-              );
-            }),
-            onChanged: (value) {
-              if (value != null) {
-                setState(() => _month = value);
-              }
-            },
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<int>(
-            value: _year,
-            decoration: InputDecoration(
-              labelText: 'Année',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            items: years.map((year) {
-              return DropdownMenuItem(
-                value: year,
-                child: Text(year.toString()),
-              );
-            }).toList(),
-            onChanged: (value) {
-              if (value != null) {
-                setState(() => _year = value);
-              }
-            },
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Annuler'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            Navigator.pop(context, {'month': _month, 'year': _year});
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF6366F1),
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          child: const Text('Confirmer'),
-        ),
-      ],
-    );
   }
 }
