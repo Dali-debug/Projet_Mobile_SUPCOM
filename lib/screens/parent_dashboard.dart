@@ -7,6 +7,7 @@ import '../widgets/app_drawer.dart';
 import '../services/parent_nurseries_service_web.dart';
 import '../services/review_service_web.dart';
 import '../services/notification_service_web.dart';
+import '../services/parent_program_service.dart';
 import 'chat_list_screen.dart';
 import 'notifications_screen.dart';
 import 'parent_enrollments_screen.dart';
@@ -23,12 +24,19 @@ class _ParentDashboardState extends State<ParentDashboard> {
   late List<dynamic> _nurseries = [];
   bool _isLoading = true;
   int _unreadNotificationCount = 0;
+  List<Map<String, dynamic>> _todayProgram = [];
+  String? _programNurseryName;
+  List<Map<String, dynamic>> _recentReviews = [];
+  bool _isProgramLoading = true;
+  bool _isReviewsLoading = true;
 
   @override
   void initState() {
     super.initState();
     _loadNurseries();
     _loadUnreadCount();
+    _loadTodayProgram();
+    _loadRecentReviews();
   }
 
   Future<void> _loadUnreadCount() async {
@@ -49,6 +57,72 @@ class _ParentDashboardState extends State<ParentDashboard> {
     }
   }
 
+  Future<void> _loadTodayProgram() async {
+    if (!mounted) return;
+    setState(() => _isProgramLoading = true);
+    try {
+      final appState = Provider.of<AppState>(context, listen: false);
+      final parentId = appState.user?.id ?? '';
+      if (parentId.isNotEmpty) {
+        final res = await ParentProgramService.getTodayProgram(parentId);
+        if (mounted && res['success'] == true) {
+          setState(() {
+            _todayProgram =
+                List<Map<String, dynamic>>.from(res['program'] ?? []);
+            _programNurseryName = res['nurseryName'];
+            _isProgramLoading = false;
+          });
+        } else {
+          if (mounted) {
+            setState(() => _isProgramLoading = false);
+          }
+        }
+      } else {
+        if (mounted) {
+          setState(() => _isProgramLoading = false);
+        }
+      }
+    } catch (e) {
+      print('❌ Error loading today program: $e');
+      if (mounted) {
+        setState(() => _isProgramLoading = false);
+      }
+    }
+  }
+
+  Future<void> _loadRecentReviews() async {
+    if (!mounted) return;
+    setState(() => _isReviewsLoading = true);
+    try {
+      final appState = Provider.of<AppState>(context, listen: false);
+      final parentId = appState.user?.id ?? '';
+      if (parentId.isNotEmpty) {
+        final res =
+            await ParentProgramService.getNurseryRecentReviews(parentId);
+        if (mounted && res['success'] == true) {
+          setState(() {
+            _recentReviews =
+                List<Map<String, dynamic>>.from(res['reviews'] ?? []);
+            _isReviewsLoading = false;
+          });
+        } else {
+          if (mounted) {
+            setState(() => _isReviewsLoading = false);
+          }
+        }
+      } else {
+        if (mounted) {
+          setState(() => _isReviewsLoading = false);
+        }
+      }
+    } catch (e) {
+      print('❌ Error loading recent reviews: $e');
+      if (mounted) {
+        setState(() => _isReviewsLoading = false);
+      }
+    }
+  }
+
   // Helper function to format rating properly (average from backend)
   String _formatRating(dynamic rating) {
     if (rating == null) return '0.0';
@@ -65,9 +139,9 @@ class _ParentDashboardState extends State<ParentDashboard> {
       final appState = Provider.of<AppState>(context, listen: false);
       final parentId = appState.user?.id ?? '';
       print('🔄 Loading nurseries for parentId: $parentId');
-      
+
       final res = await ParentNurseriesServiceWeb.getParentNurseries(parentId);
-      
+
       print('🔄 Response: $res');
       print('🔄 Success: ${res['success']}');
       print('🔄 Nurseries count: ${(res['nurseries'] ?? []).length}');
@@ -77,14 +151,15 @@ class _ParentDashboardState extends State<ParentDashboard> {
         print('🔄   - Rating: ${res['nurseries'][0]['rating']}');
         print('🔄   - ReviewCount: ${res['nurseries'][0]['reviewCount']}');
       }
-      
+
       if (mounted) {
         setState(() {
           _nurseries = res['nurseries'] ?? [];
           _isLoading = false;
           print('✅ Nurseries loaded: ${_nurseries.length} nurseries');
           for (var i = 0; i < _nurseries.length; i++) {
-            print('   - ${_nurseries[i]['name']}: rating=${_nurseries[i]['rating']}, reviewCount=${_nurseries[i]['reviewCount']}');
+            print(
+                '   - ${_nurseries[i]['name']}: rating=${_nurseries[i]['rating']}, reviewCount=${_nurseries[i]['reviewCount']}');
           }
         });
       }
@@ -435,8 +510,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
                               child: _QuickActionCard(
                                 icon: Icons.calendar_today,
                                 iconColor: const Color(0xFF9C27B0),
-                                title: 'Événements',
-                                onTap: () {},
+                                title: 'Programme',
+                                onTap: () => _showProgramDialog(),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -461,39 +536,54 @@ class _ParentDashboardState extends State<ParentDashboard> {
 
                         const SizedBox(height: 24),
 
-                        // Notifications récentes
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Notifications récentes',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF2C3E50),
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () {},
-                              child: const Text('Tout voir'),
-                            ),
-                          ],
+                        // Quelques avis
+                        const Text(
+                          'Quelques avis',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2C3E50),
+                          ),
                         ),
                         const SizedBox(height: 12),
 
-                        const _NotificationCard(
-                          icon: Icons.restaurant,
-                          title: 'Sofia a terminé son déjeuner',
-                          time: 'Il y a 1h',
-                          isUnread: true,
-                        ),
-                        const SizedBox(height: 8),
-                        const _NotificationCard(
-                          icon: Icons.photo,
-                          title: 'Photos de l\'activité peinture disponibles',
-                          time: 'Il y a 2h',
-                          isUnread: true,
-                        ),
+                        // Afficher les 2 derniers avis
+                        if (_isReviewsLoading)
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(20),
+                              child: CircularProgressIndicator(),
+                            ),
+                          )
+                        else if (_recentReviews.isEmpty)
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                'Aucun avis disponible',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          ...(_recentReviews.map((review) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: _ReviewCard(
+                                parentName: review['parent_name'] ?? 'Parent',
+                                rating: review['rating']?.toString() ?? '0',
+                                comment: review['comment'] ?? '',
+                                time: _formatTime(review['created_at']),
+                              ),
+                            );
+                          }).toList()),
                       ],
                     ),
                   ),
@@ -629,10 +719,14 @@ class _ParentDashboardState extends State<ParentDashboard> {
                     phone: nursery['phone'] ?? '',
                     email: nursery['email'] ?? '',
                     hours: nursery['hours'] ?? '',
-                    price: double.tryParse(nursery['price']?.toString() ?? '0') ?? 0.0,
+                    price:
+                        double.tryParse(nursery['price']?.toString() ?? '0') ??
+                            0.0,
                     totalSpots: nursery['totalSpots'] ?? 0,
                     availableSpots: nursery['availableSpots'] ?? 0,
-                    rating: double.tryParse(nursery['rating']?.toString() ?? '0') ?? 0.0,
+                    rating:
+                        double.tryParse(nursery['rating']?.toString() ?? '0') ??
+                            0.0,
                     ageRange: nursery['ageRange'] ?? '',
                     photo: '',
                     distance: 0.0,
@@ -641,7 +735,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
                     facilities: [],
                     staff: 0,
                   );
-                  final appState = Provider.of<AppState>(context, listen: false);
+                  final appState =
+                      Provider.of<AppState>(context, listen: false);
                   appState.selectNursery(nurseryObject);
                 },
                 icon: const Icon(Icons.arrow_forward, size: 16),
@@ -986,14 +1081,15 @@ class _ParentDashboardState extends State<ParentDashboard> {
     if (parentId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Vous devez être connecté pour contacter une garderie')),
+            content:
+                Text('Vous devez être connecté pour contacter une garderie')),
       );
       return;
     }
 
     try {
       print('💬 Initiating conversation with nursery: ${nursery['id']}');
-      
+
       // Navigate to chat list screen with context that we're starting a conversation
       if (mounted) {
         Navigator.push(
@@ -1013,6 +1109,110 @@ class _ParentDashboardState extends State<ParentDashboard> {
           SnackBar(content: Text('Erreur: $e')),
         );
       }
+    }
+  }
+
+  void _showProgramDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_programNurseryName != null
+            ? 'Programme du jour - $_programNurseryName'
+            : 'Programme du jour'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: _isProgramLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _todayProgram.isEmpty
+                  ? const Text('Aucun programme pour aujourd\'hui')
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _todayProgram.length,
+                      itemBuilder: (context, index) {
+                        final activity = _todayProgram[index];
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          child: ListTile(
+                            leading: const Icon(
+                              Icons.access_time,
+                              color: Color(0xFF9C27B0),
+                            ),
+                            title: Text(
+                              activity['time_slot'] ?? '',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  activity['activity_name'] ?? '',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF2C3E50),
+                                  ),
+                                ),
+                                if (activity['description'] != null &&
+                                    activity['description']
+                                        .toString()
+                                        .isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Text(
+                                      activity['description'],
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            trailing: activity['participant_count'] != null
+                                ? Chip(
+                                    label: Text(
+                                        '${activity['participant_count']}'),
+                                    backgroundColor: const Color(0xFF00BFA5),
+                                    labelStyle: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                        );
+                      },
+                    ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTime(dynamic createdAt) {
+    if (createdAt == null) return '';
+    try {
+      final date = DateTime.parse(createdAt.toString());
+      final now = DateTime.now();
+      final difference = now.difference(date);
+
+      if (difference.inMinutes < 60) {
+        return 'Il y a ${difference.inMinutes} min';
+      } else if (difference.inHours < 24) {
+        return 'Il y a ${difference.inHours}h';
+      } else if (difference.inDays < 7) {
+        return 'Il y a ${difference.inDays}j';
+      } else {
+        return '${date.day}/${date.month}/${date.year}';
+      }
+    } catch (e) {
+      return '';
     }
   }
 }
@@ -1116,6 +1316,107 @@ class _NotificationCard extends StatelessWidget {
                     fontWeight: isUnread ? FontWeight.w600 : FontWeight.normal,
                   ),
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  time,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReviewCard extends StatelessWidget {
+  final String parentName;
+  final String rating;
+  final String comment;
+  final String time;
+
+  const _ReviewCard({
+    required this.parentName,
+    required this.rating,
+    required this.comment,
+    required this.time,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF00BFA5),
+          width: 2,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+              color: Color(0xFF00BFA5),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        parentName,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.star,
+                          size: 16,
+                          color: Colors.amber,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          rating,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF2C3E50),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                if (comment.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    comment,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[700],
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
                 const SizedBox(height: 4),
                 Text(
                   time,
