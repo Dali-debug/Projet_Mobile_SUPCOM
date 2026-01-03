@@ -262,6 +262,62 @@ app.put('/api/users/:id', async (req, res) => {
   }
 });
 
+// Get children by parent ID
+app.get('/api/parents/:parentId/children', async (req, res) => {
+  const { parentId } = req.params;
+
+  console.log('👶 Fetching children for parent:', parentId);
+
+  try {
+    const query = `
+      SELECT 
+        c.id,
+        c.name,
+        c.age,
+        c.date_of_birth,
+        c.photo_url,
+        c.medical_notes,
+        c.created_at,
+        n.id as nursery_id,
+        n.name as nursery_name
+      FROM children c
+      LEFT JOIN enrollments e ON c.id = e.child_id AND e.status = 'active'
+      LEFT JOIN nurseries n ON e.nursery_id = n.id
+      WHERE c.parent_id = $1
+      ORDER BY c.created_at DESC
+    `;
+    
+    const result = await pool.query(query, [parentId]);
+
+    const children = result.rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      age: row.age,
+      dateOfBirth: row.date_of_birth,
+      photoUrl: row.photo_url,
+      medicalNotes: row.medical_notes,
+      createdAt: row.created_at,
+      nurseryId: row.nursery_id,
+      nurseryName: row.nursery_name
+    }));
+
+    console.log(`✅ Found ${children.length} children for parent ${parentId}`);
+
+    res.json({
+      success: true,
+      count: children.length,
+      children
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching children:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch children' 
+    });
+  }
+});
+
 // Get nurseries where a parent has enrolled children (with review count)
 app.get('/api/parents/:parentId/nurseries', async (req, res) => {
   const { parentId } = req.params;
@@ -848,7 +904,29 @@ app.post('/api/enrollments', async (req, res) => {
       nurseryId, 
       startDate
     ]);
-    console.log('✅ Enrollment created:', enrollmentResult.rows[0].id);
+    const enrollmentId = enrollmentResult.rows[0].id;
+    console.log('✅ Enrollment created:', enrollmentId);
+
+    // 5. Create payment for this enrollment
+    const paymentQuery = `
+      INSERT INTO payments (enrollment_id, parent_id, amount, status, description)
+      SELECT 
+        e.id,
+        c.parent_id,
+        COALESCE(n.price_per_month, 100.00),
+        'pending',
+        'Monthly fee for ' || c.name || ' at ' || n.name
+      FROM enrollments e
+      JOIN nurseries n ON e.nursery_id = n.id
+      JOIN children c ON e.child_id = c.id
+      WHERE e.id = $1
+      ON CONFLICT (enrollment_id) DO NOTHING
+      RETURNING id
+    `;
+    const paymentResult = await client.query(paymentQuery, [enrollmentId]);
+    if (paymentResult.rows.length > 0) {
+      console.log('✅ Payment created:', paymentResult.rows[0].id);
+    }
 
     await client.query('COMMIT');
 
@@ -932,6 +1010,107 @@ app.get('/api/enrollments/nursery/:nurseryId', async (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: 'Failed to fetch enrollments' 
+    });
+  }
+});
+
+// Get enrollments by parent ID
+app.get('/api/enrollments/parent/:parentId', async (req, res) => {
+  const { parentId } = req.params;
+  
+  console.log('📋 Fetching enrollments for parent:', parentId);
+
+  try {
+    const query = `
+      SELECT 
+        e.id as enrollment_id,
+        e.start_date,
+        e.status,
+        e.created_at,
+        c.id as child_id,
+        c.name as child_name,
+        c.date_of_birth,
+        c.age,
+        u.id as parent_id,
+        u.name as parent_name,
+        u.phone as parent_phone,
+        u.email as parent_email,
+        n.id as nursery_id,
+        n.name as nursery_name,
+        n.description,
+        n.address,
+        n.city,
+        n.postal_code,
+        n.phone as nursery_phone,
+        n.email as nursery_email,
+        n.hours,
+        n.price_per_month,
+        n.total_spots,
+        n.available_spots,
+        n.age_range,
+        n.rating,
+        n.review_count,
+        n.photo_url
+      FROM enrollments e
+      JOIN children c ON e.child_id = c.id
+      JOIN users u ON c.parent_id = u.id
+      JOIN nurseries n ON e.nursery_id = n.id
+      WHERE c.parent_id = $1
+      ORDER BY e.created_at DESC
+    `;
+    
+    const result = await pool.query(query, [parentId]);
+
+    const enrollments = result.rows.map(row => ({
+      enrollmentId: row.enrollment_id,
+      startDate: row.start_date,
+      status: row.status,
+      createdAt: row.created_at,
+      child: {
+        id: row.child_id,
+        name: row.child_name,
+        birthDate: row.date_of_birth,
+        age: row.age
+      },
+      parent: {
+        id: row.parent_id,
+        name: row.parent_name,
+        phone: row.parent_phone,
+        email: row.parent_email
+      },
+      nursery: {
+        id: row.nursery_id,
+        name: row.nursery_name,
+        description: row.description,
+        address: row.address,
+        city: row.city,
+        postalCode: row.postal_code,
+        phone: row.nursery_phone,
+        email: row.nursery_email,
+        hours: row.hours,
+        price: row.price_per_month,
+        totalSpots: row.total_spots,
+        availableSpots: row.available_spots,
+        ageRange: row.age_range,
+        rating: row.rating,
+        reviewCount: row.review_count,
+        photoUrl: row.photo_url
+      }
+    }));
+
+    console.log(`✅ Found ${enrollments.length} enrollments for parent ${parentId}`);
+
+    res.json({
+      success: true,
+      count: enrollments.length,
+      enrollments
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching parent enrollments:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch parent enrollments' 
     });
   }
 });
@@ -1044,7 +1223,10 @@ app.patch('/api/enrollments/:enrollmentId/status', async (req, res) => {
     });
   }
 
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+
     const query = `
       UPDATE enrollments
       SET status = $1, updated_at = CURRENT_TIMESTAMP
@@ -1052,14 +1234,41 @@ app.patch('/api/enrollments/:enrollmentId/status', async (req, res) => {
       RETURNING id, status, updated_at
     `;
     
-    const result = await pool.query(query, [status, enrollmentId]);
+    const result = await client.query(query, [status, enrollmentId]);
 
     if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({
         success: false,
         error: 'Enrollment not found'
       });
     }
+
+    // If status is being set to 'active', create payment if it doesn't exist
+    if ((status === 'active')) {
+      const paymentQuery = `
+        INSERT INTO payments (enrollment_id, parent_id, nursery_id, child_id, amount, payment_status)
+        SELECT 
+          e.id,
+          c.parent_id,
+          e.nursery_id,
+          e.child_id,
+          COALESCE(n.price_per_month, 100.00),
+          'unpaid'
+        FROM enrollments e
+        JOIN nurseries n ON e.nursery_id = n.id
+        JOIN children c ON e.child_id = c.id
+        WHERE e.id = $1
+        ON CONFLICT (enrollment_id) DO NOTHING
+        RETURNING id
+      `;
+      const paymentResult = await client.query(paymentQuery, [enrollmentId]);
+      if (paymentResult.rows.length > 0) {
+        console.log('✅ Payment created for enrollment:', enrollmentId);
+      }
+    }
+
+    await client.query('COMMIT');
 
     res.json({
       success: true,
@@ -1071,11 +1280,14 @@ app.patch('/api/enrollments/:enrollmentId/status', async (req, res) => {
     });
 
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error updating enrollment status:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update enrollment status'
     });
+  } finally {
+    client.release();
   }
 });
 
@@ -1852,6 +2064,59 @@ app.get('/api/nurseries/:nurseryId/reviews', async (req, res) => {
   }
 });
 
+// Get all reviews by parent
+app.get('/api/reviews/parent/:parentId', async (req, res) => {
+  const { parentId } = req.params;
+
+  console.log('⭐ Fetching reviews for parent:', parentId);
+
+  try {
+    const query = `
+      SELECT 
+        r.id,
+        r.rating,
+        r.comment,
+        r.created_at,
+        r.updated_at,
+        n.id as nursery_id,
+        n.name as nursery_name,
+        n.photo_url as nursery_photo
+      FROM reviews r
+      JOIN nurseries n ON r.nursery_id = n.id
+      WHERE r.parent_id = $1
+      ORDER BY r.created_at DESC
+    `;
+
+    const result = await pool.query(query, [parentId]);
+
+    const reviews = result.rows.map(row => ({
+      id: row.id,
+      rating: parseFloat(row.rating),
+      comment: row.comment,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      nurseryId: row.nursery_id,
+      nurseryName: row.nursery_name,
+      nurseryPhoto: row.nursery_photo
+    }));
+
+    console.log(`✅ Found ${reviews.length} reviews for parent ${parentId}`);
+
+    res.json({
+      success: true,
+      count: reviews.length,
+      reviews
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching parent reviews:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch reviews'
+    });
+  }
+});
+
 // Get a specific review by parent for a nursery
 app.get('/api/reviews/parent/:parentId/nursery/:nurseryId', async (req, res) => {
   const { parentId, nurseryId } = req.params;
@@ -1963,6 +2228,47 @@ app.delete('/api/reviews/:reviewId', async (req, res) => {
 // PAYMENT ENDPOINTS (SIMPLIFIED - ONE-TIME PAYMENT PER ENROLLMENT)
 // ============================================================================
 
+// Sync missing payments - Create payments for all accepted enrollments without payment
+app.post('/api/payments/sync', async (req, res) => {
+  try {
+    const query = `
+      INSERT INTO payments (enrollment_id, parent_id, nursery_id, child_id, amount, payment_status)
+      SELECT 
+        e.id,
+        c.parent_id,
+        e.nursery_id,
+        e.child_id,
+        COALESCE(n.price_per_month, 100.00),
+        'unpaid'
+      FROM enrollments e
+      JOIN nurseries n ON e.nursery_id = n.id
+      JOIN children c ON e.child_id = c.id
+      WHERE e.status IN ('pending', 'active')
+      AND NOT EXISTS (
+        SELECT 1 FROM payments p 
+        WHERE p.enrollment_id = e.id
+      )
+      ON CONFLICT (enrollment_id) DO NOTHING
+      RETURNING id
+    `;
+
+    const result = await pool.query(query);
+
+    res.json({
+      success: true,
+      message: `${result.rows.length} paiements créés`,
+      paymentsCreated: result.rows.length
+    });
+
+  } catch (error) {
+    console.error('Error syncing payments:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to sync payments'
+    });
+  }
+});
+
 // Get payment status for a parent
 app.get('/api/payments/parent/:parentId/status', async (req, res) => {
   try {
@@ -1986,7 +2292,7 @@ app.get('/api/payments/parent/:parentId/status', async (req, res) => {
       JOIN children c ON e.child_id = c.id
       JOIN nurseries n ON p.nursery_id = n.id
       WHERE p.parent_id = $1 
-        AND e.status IN ('accepted', 'active')
+        AND e.status IN ('pending', 'active')
       ORDER BY c.name
     `;
 
@@ -2134,7 +2440,7 @@ app.get('/api/payments/nursery/:nurseryId', async (req, res) => {
       JOIN children c ON e.child_id = c.id
       JOIN users u ON p.parent_id = u.id
       WHERE p.nursery_id = $1 
-        AND e.status IN ('accepted', 'active')
+        AND e.status IN ('pending', 'active')
       ORDER BY p.payment_status, c.name
     `;
 
@@ -2178,7 +2484,7 @@ app.get('/api/payments/owner/:ownerId', async (req, res) => {
       JOIN children c ON e.child_id = c.id
       JOIN users u ON p.parent_id = u.id
       WHERE n.owner_id = $1 
-        AND e.status IN ('accepted', 'active')
+        AND e.status IN ('pending', 'active')
       ORDER BY p.payment_status, c.name
     `;
 
@@ -2214,7 +2520,7 @@ app.get('/api/payments/nursery/:nurseryId/stats', async (req, res) => {
       FROM payments p
       JOIN enrollments e ON p.enrollment_id = e.id
       WHERE p.nursery_id = $1 
-        AND e.status IN ('accepted', 'active')
+        AND e.status IN ('pending', 'active')
     `;
 
     const result = await pool.query(query, [nurseryId]);
@@ -2265,7 +2571,7 @@ app.get('/api/payments/owner/:ownerId/stats', async (req, res) => {
       JOIN nurseries n ON p.nursery_id = n.id
       JOIN enrollments e ON p.enrollment_id = e.id
       WHERE n.owner_id = $1 
-        AND e.status IN ('accepted', 'active')
+        AND e.status IN ('pending', 'active')
     `;
 
     const result = await pool.query(query, [ownerId]);
@@ -2660,6 +2966,125 @@ app.post('/api/conversations/:conversationId/mark-read', async (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: 'Failed to mark messages as read' 
+    });
+  }
+});
+
+// ============== PARENT PROGRAM & REVIEWS ENDPOINTS ==============
+
+// Get today's program for parent's enrolled nursery
+app.get('/api/parents/:parentId/today-program', async (req, res) => {
+  try {
+    const { parentId } = req.params;
+
+    // First, get the nursery where the parent has enrolled children
+    const nurseryQuery = `
+      SELECT DISTINCT n.id, n.name
+      FROM nurseries n
+      JOIN enrollments e ON n.id = e.nursery_id
+      JOIN children c ON e.child_id = c.id
+      WHERE c.parent_id = $1 AND e.status IN ('pending', 'active')
+      LIMIT 1
+    `;
+    
+    const nurseryResult = await pool.query(nurseryQuery, [parentId]);
+    
+    if (nurseryResult.rows.length === 0) {
+      return res.json({
+        success: true,
+        program: [],
+        nurseryName: null
+      });
+    }
+
+    const nursery = nurseryResult.rows[0];
+
+    // Get today's schedule for this nursery
+    const today = new Date().toISOString().split('T')[0];
+    const scheduleQuery = `
+      SELECT 
+        id,
+        time_slot,
+        activity_name,
+        description,
+        participant_count,
+        created_at
+      FROM daily_schedule
+      WHERE nursery_id = $1 
+        AND DATE(created_at) = $2
+      ORDER BY time_slot ASC
+    `;
+    
+    const scheduleResult = await pool.query(scheduleQuery, [nursery.id, today]);
+
+    res.json({
+      success: true,
+      program: scheduleResult.rows,
+      nurseryName: nursery.name
+    });
+
+  } catch (error) {
+    console.error('Error getting today program:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get program'
+    });
+  }
+});
+
+// Get recent reviews for parent's enrolled nursery
+app.get('/api/parents/:parentId/nursery-reviews', async (req, res) => {
+  try {
+    const { parentId } = req.params;
+
+    // First, get the nursery where the parent has enrolled children
+    const nurseryQuery = `
+      SELECT DISTINCT n.id
+      FROM nurseries n
+      JOIN enrollments e ON n.id = e.nursery_id
+      JOIN children c ON e.child_id = c.id
+      WHERE c.parent_id = $1 AND e.status IN ('pending', 'active')
+      LIMIT 1
+    `;
+    
+    const nurseryResult = await pool.query(nurseryQuery, [parentId]);
+    
+    if (nurseryResult.rows.length === 0) {
+      return res.json({
+        success: true,
+        reviews: []
+      });
+    }
+
+    const nurseryId = nurseryResult.rows[0].id;
+
+    // Get the 2 most recent reviews for this nursery
+    const reviewsQuery = `
+      SELECT 
+        r.id,
+        r.rating,
+        r.comment,
+        r.created_at,
+        u.name as parent_name
+      FROM reviews r
+      JOIN users u ON r.parent_id = u.id
+      WHERE r.nursery_id = $1
+      ORDER BY r.created_at DESC
+      LIMIT 2
+    `;
+    
+    const reviewsResult = await pool.query(reviewsQuery, [nurseryId]);
+
+    res.json({
+      success: true,
+      reviews: reviewsResult.rows
+    });
+
+  } catch (error) {
+    console.error('Error getting nursery reviews:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get reviews'
     });
   }
 });
