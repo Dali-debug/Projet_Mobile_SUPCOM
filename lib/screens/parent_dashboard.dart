@@ -6,9 +6,11 @@ import '../models/nursery.dart';
 import '../widgets/app_drawer.dart';
 import '../services/parent_nurseries_service_web.dart';
 import '../services/review_service_web.dart';
+import '../services/parent_program_service.dart';
 import 'chat_list_screen.dart';
 import 'parent_enrollments_screen.dart';
 import 'parent_payment_screen.dart';
+import 'package:intl/intl.dart';
 
 class ParentDashboard extends StatefulWidget {
   const ParentDashboard({super.key});
@@ -19,12 +21,19 @@ class ParentDashboard extends StatefulWidget {
 
 class _ParentDashboardState extends State<ParentDashboard> {
   late List<dynamic> _nurseries = [];
+  late List<dynamic> _todayProgram = [];
+  late List<dynamic> _recentReviews = [];
+  String? _nurseryName;
   bool _isLoading = true;
+  bool _isProgramLoading = true;
+  bool _isReviewsLoading = true;
 
   @override
   void initState() {
     super.initState();
     _loadNurseries();
+    _loadTodayProgram();
+    _loadRecentReviews();
   }
 
   // Helper function to format rating properly (average from backend)
@@ -70,6 +79,47 @@ class _ParentDashboardState extends State<ParentDashboard> {
       print('❌ Error in _loadNurseries: $e');
       if (mounted) {
         setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _loadTodayProgram() async {
+    if (!mounted) return;
+    setState(() => _isProgramLoading = true);
+    try {
+      final appState = Provider.of<AppState>(context, listen: false);
+      final parentId = appState.user?.id ?? '';
+      final res = await ParentProgramService.getTodayProgram(parentId);
+      if (mounted) {
+        setState(() {
+          _todayProgram = res['program'] ?? [];
+          _nurseryName = res['nurseryName'];
+          _isProgramLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProgramLoading = false);
+      }
+    }
+  }
+
+  Future<void> _loadRecentReviews() async {
+    if (!mounted) return;
+    setState(() => _isReviewsLoading = true);
+    try {
+      final appState = Provider.of<AppState>(context, listen: false);
+      final parentId = appState.user?.id ?? '';
+      final res = await ParentProgramService.getNurseryRecentReviews(parentId);
+      if (mounted) {
+        setState(() {
+          _recentReviews = res['reviews'] ?? [];
+          _isReviewsLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isReviewsLoading = false);
       }
     }
   }
@@ -397,8 +447,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
                               child: _QuickActionCard(
                                 icon: Icons.calendar_today,
                                 iconColor: const Color(0xFF9C27B0),
-                                title: 'Événements',
-                                onTap: () {},
+                                title: 'Programme',
+                                onTap: () => _showTodayProgramDialog(),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -443,19 +493,37 @@ class _ParentDashboardState extends State<ParentDashboard> {
                         ),
                         const SizedBox(height: 12),
 
-                        const _NotificationCard(
-                          icon: Icons.restaurant,
-                          title: 'Sofia a terminé son déjeuner',
-                          time: 'Il y a 1h',
-                          isUnread: true,
-                        ),
-                        const SizedBox(height: 8),
-                        const _NotificationCard(
-                          icon: Icons.photo,
-                          title: 'Photos de l\'activité peinture disponibles',
-                          time: 'Il y a 2h',
-                          isUnread: true,
-                        ),
+                        // Display recent reviews or empty state
+                        if (_isReviewsLoading)
+                          const Center(
+                            child: CircularProgressIndicator(),
+                          )
+                        else if (_recentReviews.isEmpty)
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Text(
+                                'Aucun avis disponible',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          ...(_recentReviews.map((review) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: _NotificationCard(
+                                icon: Icons.star,
+                                title: review['comment'] ?? 'Avis sans commentaire',
+                                time: _formatReviewTime(review['created_at']),
+                                subtitle: '${review['parent_name']} - ${review['rating']}/5 ⭐',
+                                isUnread: false,
+                              ),
+                            );
+                          }).toList()),
                       ],
                     ),
                   ),
@@ -653,6 +721,140 @@ class _ParentDashboardState extends State<ParentDashboard> {
           ],
         ),
       ),
+    );
+  }
+
+  String _formatReviewTime(String createdAt) {
+    try {
+      final date = DateTime.parse(createdAt);
+      final now = DateTime.now();
+      final difference = now.difference(date);
+
+      if (difference.inMinutes < 60) {
+        return 'Il y a ${difference.inMinutes} min';
+      } else if (difference.inHours < 24) {
+        return 'Il y a ${difference.inHours}h';
+      } else if (difference.inDays < 7) {
+        return 'Il y a ${difference.inDays}j';
+      } else {
+        return DateFormat('dd/MM/yyyy').format(date);
+      }
+    } catch (e) {
+      return '';
+    }
+  }
+
+  void _showTodayProgramDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.calendar_today, color: Color(0xFF9C27B0)),
+              const SizedBox(width: 8),
+              const Text('Programme d\'aujourd\'hui'),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: _isProgramLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _todayProgram.isEmpty
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.event_busy,
+                            size: 64,
+                            color: Colors.grey,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _nurseryName == null
+                                ? 'Aucune garderie inscrite'
+                                : 'Aucun programme pour aujourd\'hui',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.grey,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (_nurseryName != null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: Text(
+                                _nurseryName!,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF00BFA5),
+                                ),
+                              ),
+                            ),
+                          Expanded(
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: _todayProgram.length,
+                              itemBuilder: (context, index) {
+                                final item = _todayProgram[index];
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  child: ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: const Color(0xFF9C27B0),
+                                      child: Text(
+                                        item['time_slot']?.toString().split(':')[0] ?? '',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    title: Text(
+                                      item['activity_name'] ?? '',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    subtitle: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('🕐 ${item['time_slot'] ?? ''}'),
+                                        if (item['description'] != null)
+                                          Text(item['description']),
+                                        if (item['participant_count'] != null)
+                                          Text(
+                                            '👥 ${item['participant_count']} participants',
+                                            style: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Fermer'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -1034,12 +1236,14 @@ class _NotificationCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String time;
+  final String? subtitle;
   final bool isUnread;
 
   const _NotificationCard({
     required this.icon,
     required this.title,
     required this.time,
+    this.subtitle,
     this.isUnread = false,
   });
 
@@ -1077,8 +1281,21 @@ class _NotificationCard extends StatelessWidget {
                     fontSize: 14,
                     fontWeight: isUnread ? FontWeight.w600 : FontWeight.normal,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
+                if (subtitle != null) ...[
+                  Text(
+                    subtitle!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[700],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
                 Text(
                   time,
                   style: TextStyle(

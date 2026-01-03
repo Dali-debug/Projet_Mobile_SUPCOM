@@ -2660,6 +2660,125 @@ app.post('/api/conversations/:conversationId/mark-read', async (req, res) => {
   }
 });
 
+// ============== PARENT PROGRAM & REVIEWS ENDPOINTS ==============
+
+// Get today's program for parent's enrolled nursery
+app.get('/api/parents/:parentId/today-program', async (req, res) => {
+  try {
+    const { parentId } = req.params;
+
+    // First, get the nursery where the parent has enrolled children
+    const nurseryQuery = `
+      SELECT DISTINCT n.id, n.name
+      FROM nurseries n
+      JOIN enrollments e ON n.id = e.nursery_id
+      JOIN children c ON e.child_id = c.id
+      WHERE c.parent_id = $1 AND e.status IN ('accepted', 'active')
+      LIMIT 1
+    `;
+    
+    const nurseryResult = await pool.query(nurseryQuery, [parentId]);
+    
+    if (nurseryResult.rows.length === 0) {
+      return res.json({
+        success: true,
+        program: [],
+        nurseryName: null
+      });
+    }
+
+    const nursery = nurseryResult.rows[0];
+
+    // Get today's schedule for this nursery
+    const today = new Date().toISOString().split('T')[0];
+    const scheduleQuery = `
+      SELECT 
+        id,
+        time_slot,
+        activity_name,
+        description,
+        participant_count,
+        created_at
+      FROM daily_schedule
+      WHERE nursery_id = $1 
+        AND DATE(created_at) = $2
+      ORDER BY time_slot ASC
+    `;
+    
+    const scheduleResult = await pool.query(scheduleQuery, [nursery.id, today]);
+
+    res.json({
+      success: true,
+      program: scheduleResult.rows,
+      nurseryName: nursery.name
+    });
+
+  } catch (error) {
+    console.error('Error getting today program:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get program'
+    });
+  }
+});
+
+// Get recent reviews for parent's enrolled nursery
+app.get('/api/parents/:parentId/nursery-reviews', async (req, res) => {
+  try {
+    const { parentId } = req.params;
+
+    // First, get the nursery where the parent has enrolled children
+    const nurseryQuery = `
+      SELECT DISTINCT n.id
+      FROM nurseries n
+      JOIN enrollments e ON n.id = e.nursery_id
+      JOIN children c ON e.child_id = c.id
+      WHERE c.parent_id = $1 AND e.status IN ('accepted', 'active')
+      LIMIT 1
+    `;
+    
+    const nurseryResult = await pool.query(nurseryQuery, [parentId]);
+    
+    if (nurseryResult.rows.length === 0) {
+      return res.json({
+        success: true,
+        reviews: []
+      });
+    }
+
+    const nurseryId = nurseryResult.rows[0].id;
+
+    // Get the 2 most recent reviews for this nursery
+    const reviewsQuery = `
+      SELECT 
+        r.id,
+        r.rating,
+        r.comment,
+        r.created_at,
+        u.name as parent_name
+      FROM reviews r
+      JOIN users u ON r.parent_id = u.id
+      WHERE r.nursery_id = $1
+      ORDER BY r.created_at DESC
+      LIMIT 2
+    `;
+    
+    const reviewsResult = await pool.query(reviewsQuery, [nurseryId]);
+
+    res.json({
+      success: true,
+      reviews: reviewsResult.rows
+    });
+
+  } catch (error) {
+    console.error('Error getting nursery reviews:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get reviews'
+    });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
