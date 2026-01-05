@@ -1,45 +1,84 @@
 # Database Setup Guide
 
+This folder contains the database schema and initialization files for the Nursery Management System.
+
+## Files in this folder
+
+- **schema.sql** - Complete database schema (tables, indexes, triggers). Use this to create a fresh database.
+- **init.sql** - Database schema with sample data for testing and development.
+- **README.md** - This documentation file.
+
 ## Prerequisites
-- Docker Desktop installed on your system
-- Docker Compose
+- PostgreSQL 15 or higher
+- Docker Desktop (optional, if using docker-compose)
 
-## Quick Start
+## Setup Options
 
-### 1. Start the Database
+### Option 1: Using Docker (Recommended)
 
+1. Start the database with Docker Compose:
 ```bash
 docker-compose up -d
 ```
 
 This will:
 - Create and start a PostgreSQL 15 container
-- Initialize the database with all tables and sample data
+- Initialize the database with all tables and sample data from init.sql
 - Start pgAdmin (optional web interface)
 
-### 2. Access the Database
+2. The database will be automatically initialized with:
+   - All required tables
+   - Indexes and triggers
+   - Sample data for testing
 
-**PostgreSQL Connection Details:**
+### Option 2: Manual Setup
+
+If you prefer to set up PostgreSQL manually:
+
+1. Create a new database:
+```sql
+CREATE DATABASE nursery_db;
+```
+
+2. Run the schema file:
+```bash
+psql -U your_username -d nursery_db -f schema.sql
+```
+
+Or if you want sample data:
+```bash
+psql -U your_username -d nursery_db -f init.sql
+```
+
+## Database Connection Details
+
+**PostgreSQL Connection:**
 - **Host:** localhost
 - **Port:** 5432
 - **Database:** nursery_db
 - **Username:** nursery_admin
 - **Password:** nursery_password_2025
 
-**pgAdmin Web Interface:**
+**pgAdmin Web Interface (if using Docker):**
 - URL: http://localhost:5050
 - Email: admin@nursery.com
 - Password: admin123
 
-### 3. Stop the Database
+## Managing the Docker Database
 
+### Stop the Database
 ```bash
 docker-compose down
 ```
 
-To remove all data:
+### Stop and Remove All Data
 ```bash
 docker-compose down -v
+```
+
+### Restart the Database
+```bash
+docker-compose restart
 ```
 
 ## Database Structure
@@ -86,9 +125,7 @@ docker-compose down -v
 
 11. **nursery_activities** - Nursery activities (many-to-many)
 
-12. **child_activities** - Educational activities for enrolled children
-
-13. **homework** - Homework/assignments for children
+12. **daily_schedule** - Daily activities and programs scheduled by nurseries
 
 ## Useful Commands
 

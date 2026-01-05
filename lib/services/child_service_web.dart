@@ -160,8 +160,7 @@ class ChildServiceWeb {
   }
 
   // Get children's activities
-  Future<List<Map<String, dynamic>>> getChildActivities(
-      String childId) async {
+  Future<List<Map<String, dynamic>>> getChildActivities(String childId) async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/children/$childId/activities'),
@@ -177,27 +176,6 @@ class ChildServiceWeb {
       return [];
     } catch (e) {
       print('Error getting child activities: $e');
-      return [];
-    }
-  }
-
-  // Get children's homework
-  Future<List<Map<String, dynamic>>> getChildHomework(String childId) async {
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/children/$childId/homework'),
-        headers: {'Content-Type': 'application/json'},
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['success'] == true) {
-          return List<Map<String, dynamic>>.from(data['homework'] ?? []);
-        }
-      }
-      return [];
-    } catch (e) {
-      print('Error getting child homework: $e');
       return [];
     }
   }
