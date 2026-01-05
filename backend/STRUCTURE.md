@@ -22,7 +22,7 @@ backend/
 │   └── conversations.js  # Chat/messaging routes
 ├── utils/
 │   └── helpers.js        # Utility functions (hashPassword, createNotification)
-├── server.js             # Main server file (now ~52 lines)
+├── server.js             # Main server file 
 ├── server_backup.js      # Backup of original server.js
 └── package.json
 ```
