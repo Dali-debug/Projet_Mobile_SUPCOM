@@ -1,11 +1,16 @@
 -- Nursery Management System Database Schema
--- Created: December 31, 2025
+-- Created: January 5, 2026
+-- Updated: Removed homework and child_activities tables
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- ============================================
+-- CORE TABLES
+-- ============================================
+
 -- Users table (authentication and base user info)
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
@@ -17,7 +22,7 @@ CREATE TABLE users (
 );
 
 -- Nurseries table
-CREATE TABLE nurseries (
+CREATE TABLE IF NOT EXISTS nurseries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     owner_id UUID REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
@@ -43,7 +48,7 @@ CREATE TABLE nurseries (
 );
 
 -- Nursery facilities (many-to-many)
-CREATE TABLE nursery_facilities (
+CREATE TABLE IF NOT EXISTS nursery_facilities (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nursery_id UUID REFERENCES nurseries(id) ON DELETE CASCADE,
     facility_name VARCHAR(100) NOT NULL,
@@ -52,7 +57,7 @@ CREATE TABLE nursery_facilities (
 );
 
 -- Nursery activities (many-to-many)
-CREATE TABLE nursery_activities (
+CREATE TABLE IF NOT EXISTS nursery_activities (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nursery_id UUID REFERENCES nurseries(id) ON DELETE CASCADE,
     activity_name VARCHAR(100) NOT NULL,
@@ -61,7 +66,7 @@ CREATE TABLE nursery_activities (
 );
 
 -- Children table
-CREATE TABLE children (
+CREATE TABLE IF NOT EXISTS children (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     parent_id UUID REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
@@ -74,7 +79,7 @@ CREATE TABLE children (
 );
 
 -- Enrollments (children enrolled in nurseries)
-CREATE TABLE enrollments (
+CREATE TABLE IF NOT EXISTS enrollments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     child_id UUID REFERENCES children(id) ON DELETE CASCADE,
     nursery_id UUID REFERENCES nurseries(id) ON DELETE CASCADE,
@@ -88,7 +93,7 @@ CREATE TABLE enrollments (
 );
 
 -- Reviews table
-CREATE TABLE reviews (
+CREATE TABLE IF NOT EXISTS reviews (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nursery_id UUID REFERENCES nurseries(id) ON DELETE CASCADE,
     parent_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -99,7 +104,7 @@ CREATE TABLE reviews (
 );
 
 -- Payments table
-CREATE TABLE payments (
+CREATE TABLE IF NOT EXISTS payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     enrollment_id UUID REFERENCES enrollments(id) ON DELETE CASCADE,
     parent_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -112,41 +117,8 @@ CREATE TABLE payments (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Conversations table
-CREATE TABLE conversations (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    parent_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    nursery_id UUID REFERENCES nurseries(id) ON DELETE CASCADE,
-    last_message_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(parent_id, nursery_id)
-);
-
--- Messages table
-CREATE TABLE messages (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
-    sender_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    recipient_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    content TEXT NOT NULL,
-    is_read BOOLEAN DEFAULT FALSE,
-    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Notifications table
-CREATE TABLE notifications (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    type VARCHAR(50) NOT NULL,
-    title VARCHAR(255),
-    message TEXT NOT NULL,
-    is_read BOOLEAN DEFAULT FALSE,
-    related_id UUID,
-    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Daily schedule for nursery programs
-CREATE TABLE daily_schedule (
+-- Daily schedule table for nursery programs
+CREATE TABLE IF NOT EXISTS daily_schedule (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nursery_id UUID REFERENCES nurseries(id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL,
@@ -160,30 +132,69 @@ CREATE TABLE daily_schedule (
 );
 
 -- ============================================
+-- MESSAGING & COMMUNICATION TABLES
+-- ============================================
+
+-- Conversations table
+CREATE TABLE IF NOT EXISTS conversations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    parent_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    nursery_id UUID REFERENCES nurseries(id) ON DELETE CASCADE,
+    last_message_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(parent_id, nursery_id)
+);
+
+-- Messages table
+CREATE TABLE IF NOT EXISTS messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+    sender_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    recipient_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Notifications table
+CREATE TABLE IF NOT EXISTS notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(255),
+    message TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    related_id UUID,
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
 -- INDEXES for performance optimization
 -- ============================================
 
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_type ON users(user_type);
-CREATE INDEX idx_nurseries_owner ON nurseries(owner_id);
-CREATE INDEX idx_nurseries_city ON nurseries(city);
-CREATE INDEX idx_nurseries_rating ON nurseries(rating);
-CREATE INDEX idx_children_parent ON children(parent_id);
-CREATE INDEX idx_enrollments_child ON enrollments(child_id);
-CREATE INDEX idx_enrollments_nursery ON enrollments(nursery_id);
-CREATE INDEX idx_enrollments_status ON enrollments(status);
-CREATE INDEX idx_reviews_nursery ON reviews(nursery_id);
-CREATE INDEX idx_reviews_parent ON reviews(parent_id);
-CREATE INDEX idx_payments_enrollment ON payments(enrollment_id);
-CREATE INDEX idx_payments_parent ON payments(parent_id);
-CREATE INDEX idx_payments_status ON payments(status);
-CREATE INDEX idx_conversations_parent ON conversations(parent_id);
-CREATE INDEX idx_conversations_nursery ON conversations(nursery_id);
-CREATE INDEX idx_messages_conversation ON messages(conversation_id);
-CREATE INDEX idx_messages_sender ON messages(sender_id);
-CREATE INDEX idx_messages_read ON messages(is_read);
-CREATE INDEX idx_notifications_user ON notifications(user_id);
-CREATE INDEX idx_notifications_read ON notifications(is_read);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_type ON users(user_type);
+CREATE INDEX IF NOT EXISTS idx_nurseries_owner ON nurseries(owner_id);
+CREATE INDEX IF NOT EXISTS idx_nurseries_city ON nurseries(city);
+CREATE INDEX IF NOT EXISTS idx_nurseries_rating ON nurseries(rating);
+CREATE INDEX IF NOT EXISTS idx_children_parent ON children(parent_id);
+CREATE INDEX IF NOT EXISTS idx_enrollments_child ON enrollments(child_id);
+CREATE INDEX IF NOT EXISTS idx_enrollments_nursery ON enrollments(nursery_id);
+CREATE INDEX IF NOT EXISTS idx_enrollments_status ON enrollments(status);
+CREATE INDEX IF NOT EXISTS idx_reviews_nursery ON reviews(nursery_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_parent ON reviews(parent_id);
+CREATE INDEX IF NOT EXISTS idx_payments_enrollment ON payments(enrollment_id);
+CREATE INDEX IF NOT EXISTS idx_payments_parent ON payments(parent_id);
+CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
+CREATE INDEX IF NOT EXISTS idx_conversations_parent ON conversations(parent_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_nursery ON conversations(nursery_id);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id);
+CREATE INDEX IF NOT EXISTS idx_messages_read ON messages(is_read);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(is_read);
+CREATE INDEX IF NOT EXISTS idx_daily_schedule_nursery ON daily_schedule(nursery_id);
+CREATE INDEX IF NOT EXISTS idx_daily_schedule_date ON daily_schedule(scheduled_date);
 
 -- ============================================
 -- TRIGGERS
@@ -211,16 +222,19 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_update_rating_insert ON reviews;
 CREATE TRIGGER trigger_update_rating_insert
 AFTER INSERT ON reviews
 FOR EACH ROW
 EXECUTE FUNCTION update_nursery_rating();
 
+DROP TRIGGER IF EXISTS trigger_update_rating_update ON reviews;
 CREATE TRIGGER trigger_update_rating_update
 AFTER UPDATE ON reviews
 FOR EACH ROW
 EXECUTE FUNCTION update_nursery_rating();
 
+DROP TRIGGER IF EXISTS trigger_update_rating_delete ON reviews;
 CREATE TRIGGER trigger_update_rating_delete
 AFTER DELETE ON reviews
 FOR EACH ROW
@@ -237,6 +251,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_update_conversation ON messages;
 CREATE TRIGGER trigger_update_conversation
 AFTER INSERT ON messages
 FOR EACH ROW
@@ -251,90 +266,37 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_nurseries_updated_at ON nurseries;
 CREATE TRIGGER update_nurseries_updated_at BEFORE UPDATE ON nurseries
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_children_updated_at ON children;
 CREATE TRIGGER update_children_updated_at BEFORE UPDATE ON children
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_enrollments_updated_at ON enrollments;
 CREATE TRIGGER update_enrollments_updated_at BEFORE UPDATE ON enrollments
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_daily_schedule_updated_at ON daily_schedule;
+CREATE TRIGGER update_daily_schedule_updated_at BEFORE UPDATE ON daily_schedule
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- ============================================
--- SAMPLE DATA (for testing)
+-- COMMENTS
 -- ============================================
 
--- Insert sample parent user
-INSERT INTO users (email, password_hash, user_type, name, phone) VALUES
-('parent1@example.com', '$2a$10$abcdefghijklmnopqrstuv', 'parent', 'Ahmed Ben Ali', '+216 20 123 456'),
-('parent2@example.com', '$2a$10$abcdefghijklmnopqrstuv', 'parent', 'Fatima Trabelsi', '+216 20 456 789');
-
--- Insert sample nursery user
-INSERT INTO users (email, password_hash, user_type, name, phone) VALUES
-('nursery1@example.com', '$2a$10$abcdefghijklmnopqrstuv', 'nursery', 'Happy Kids Nursery', '+216 71 123 456'),
-('nursery2@example.com', '$2a$10$abcdefghijklmnopqrstuv', 'nursery', 'Sunny Days Nursery', '+216 71 789 012');
-
--- Insert sample nurseries
-INSERT INTO nurseries (owner_id, name, address, city, postal_code, latitude, longitude, description, hours, phone, email, photo_url, price_per_month, available_spots, total_spots, staff_count, age_range) VALUES
-(
-    (SELECT id FROM users WHERE email = 'nursery1@example.com'),
-    'Happy Kids Nursery',
-    '123 Avenue Habib Bourguiba',
-    'Tunis',
-    '1000',
-    36.8065,
-    10.1815,
-    'A wonderful place for your children to learn and play',
-    '7:00 AM - 6:00 PM',
-    '+216 71 123 456',
-    'contact@happykids.tn',
-    'https://images.unsplash.com/photo-1587654780291-39c9404d746b',
-    500.00,
-    5,
-    20,
-    8,
-    '6 months - 5 years'
-),
-(
-    (SELECT id FROM users WHERE email = 'nursery2@example.com'),
-    'Sunny Days Nursery',
-    '456 Rue de la Liberté',
-    'Sfax',
-    '3000',
-    34.7406,
-    10.7603,
-    'Quality care and education for your little ones',
-    '6:30 AM - 7:00 PM',
-    '+216 71 789 012',
-    'info@sunnydays.tn',
-    'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9',
-    450.00,
-    10,
-    25,
-    10,
-    '1 year - 6 years'
-);
-
--- Insert sample facilities
-INSERT INTO nursery_facilities (nursery_id, facility_name) VALUES
-((SELECT id FROM nurseries WHERE name = 'Happy Kids Nursery'), 'Playground'),
-((SELECT id FROM nurseries WHERE name = 'Happy Kids Nursery'), 'Swimming Pool'),
-((SELECT id FROM nurseries WHERE name = 'Happy Kids Nursery'), 'Music Room'),
-((SELECT id FROM nurseries WHERE name = 'Sunny Days Nursery'), 'Garden'),
-((SELECT id FROM nurseries WHERE name = 'Sunny Days Nursery'), 'Library'),
-((SELECT id FROM nurseries WHERE name = 'Sunny Days Nursery'), 'Art Studio');
-
--- Insert sample activities
-INSERT INTO nursery_activities (nursery_id, activity_name) VALUES
-((SELECT id FROM nurseries WHERE name = 'Happy Kids Nursery'), 'Music Lessons'),
-((SELECT id FROM nurseries WHERE name = 'Happy Kids Nursery'), 'Arts & Crafts'),
-((SELECT id FROM nurseries WHERE name = 'Happy Kids Nursery'), 'Storytelling'),
-((SELECT id FROM nurseries WHERE name = 'Sunny Days Nursery'), 'Dance Classes'),
-((SELECT id FROM nurseries WHERE name = 'Sunny Days Nursery'), 'Outdoor Play'),
-((SELECT id FROM nurseries WHERE name = 'Sunny Days Nursery'), 'Language Learning');
-
--- Database initialization complete
-COMMENT ON DATABASE nursery_db IS 'Nursery Management System Database - Initialized on December 31, 2025';
+COMMENT ON TABLE users IS 'User accounts for parents and nursery owners';
+COMMENT ON TABLE nurseries IS 'Nursery/daycare information';
+COMMENT ON TABLE children IS 'Children registered by parents';
+COMMENT ON TABLE enrollments IS 'Children enrolled in nurseries';
+COMMENT ON TABLE reviews IS 'Parent reviews and ratings for nurseries';
+COMMENT ON TABLE payments IS 'Payment transactions for enrollments';
+COMMENT ON TABLE daily_schedule IS 'Daily activities and programs scheduled by nurseries';
+COMMENT ON TABLE conversations IS 'Chat conversations between parents and nurseries';
+COMMENT ON TABLE messages IS 'Individual messages within conversations';
+COMMENT ON TABLE notifications IS 'System notifications for users';
