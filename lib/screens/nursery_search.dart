@@ -14,6 +14,9 @@ class _NurserySearchState extends State<NurserySearch> {
   final _searchController = TextEditingController();
   bool _isLoading = false;
   List<Nursery> _searchResults = [];
+  List<Nursery> _filteredResults = [];
+  double _minRating = 0.0;
+  bool _showFilters = false;
 
   @override
   void initState() {
@@ -27,7 +30,19 @@ class _NurserySearchState extends State<NurserySearch> {
     final results = await appState.searchNurseries();
     setState(() {
       _searchResults = results;
+      _applyFilters();
       _isLoading = false;
+    });
+  }
+
+  void _applyFilters() {
+    setState(() {
+      _filteredResults = _searchResults.where((nursery) {
+        return nursery.rating >= _minRating;
+      }).toList();
+      
+      // Trier par note décroissante
+      _filteredResults.sort((a, b) => b.rating.compareTo(a.rating));
     });
   }
 
@@ -37,6 +52,7 @@ class _NurserySearchState extends State<NurserySearch> {
     final results = await appState.searchNurseries(city: query);
     setState(() {
       _searchResults = results;
+      _applyFilters();
       _isLoading = false;
     });
   }
@@ -83,11 +99,31 @@ class _NurserySearchState extends State<NurserySearch> {
                         ),
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.tune, color: Colors.white),
-                      onPressed: () {
-                        // Show filters
-                      },
+                    Stack(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.tune, color: Colors.white),
+                          onPressed: () {
+                            setState(() => _showFilters = !_showFilters);
+                          },
+                        ),
+                        if (_minRating > 0)
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 8,
+                                minHeight: 8,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -150,6 +186,119 @@ class _NurserySearchState extends State<NurserySearch> {
                 ),
               ),
 
+              // Panneau de filtres
+              if (_showFilters)
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Filtres',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2C3E50),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _minRating = 0.0;
+                                _applyFilters();
+                              });
+                            },
+                            child: const Text('Réinitialiser'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Note minimale',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2C3E50),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Slider(
+                              value: _minRating,
+                              min: 0,
+                              max: 5,
+                              divisions: 10,
+                              activeColor: const Color(0xFF00BFA5),
+                              label: _minRating == 0
+                                  ? 'Toutes'
+                                  : '${_minRating.toStringAsFixed(1)}+',
+                              onChanged: (value) {
+                                setState(() {
+                                  _minRating = value;
+                                  _applyFilters();
+                                });
+                              },
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF00BFA5).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.star,
+                                  size: 16,
+                                  color: Color(0xFFFFB300),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _minRating == 0
+                                      ? 'Toutes'
+                                      : '${_minRating.toStringAsFixed(1)}+',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF2C3E50),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${_filteredResults.length} garderie(s) correspond(ent) à vos critères',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
               const SizedBox(height: 8),
 
               // Content
@@ -169,29 +318,85 @@ class _NurserySearchState extends State<NurserySearch> {
                           children: [
                             Padding(
                               padding: const EdgeInsets.all(20),
-                              child: Text(
-                                '${_searchResults.length} garderies trouvées',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF2C3E50),
-                                ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    '${_filteredResults.length} garderie(s) trouvée(s)',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF2C3E50),
+                                    ),
+                                  ),
+                                  if (_minRating > 0)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF00BFA5),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                            Icons.filter_alt,
+                                            size: 14,
+                                            color: Colors.white,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '${_minRating.toStringAsFixed(1)}+',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                             Expanded(
-                              child: _searchResults.isEmpty
-                                  ? const Center(
-                                      child: Text(
-                                        'Aucune garderie trouvée',
-                                        style: TextStyle(color: Colors.grey),
+                              child: _filteredResults.isEmpty
+                                  ? Center(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(
+                                            Icons.search_off,
+                                            size: 64,
+                                            color: Colors.grey,
+                                          ),
+                                          const SizedBox(height: 16),
+                                          const Text(
+                                            'Aucune garderie ne correspond',
+                                            style: TextStyle(
+                                              color: Colors.grey,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Essayez de modifier vos critères',
+                                            style: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     )
                                   : ListView.builder(
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 20),
-                                      itemCount: _searchResults.length,
+                                      itemCount: _filteredResults.length,
                                       itemBuilder: (context, index) {
-                                        final nursery = _searchResults[index];
+                                        final nursery = _filteredResults[index];
                                         return _NurseryCard(
                                           nursery: nursery,
                                           onTap: () =>

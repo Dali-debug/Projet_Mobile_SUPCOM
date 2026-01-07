@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../services/review_service_web.dart';
+import '../services/favorites_service.dart';
 import '../models/review.dart';
 import '../models/nursery.dart';
 import 'enrollment_screen.dart';
@@ -16,11 +17,42 @@ class NurseryDetails extends StatefulWidget {
 class _NurseryDetailsState extends State<NurseryDetails> {
   List<Map<String, dynamic>> _reviews = [];
   bool _isLoadingReviews = false;
+  bool _isFavorite = false;
 
   @override
   void initState() {
     super.initState();
     _loadReviews();
+    _loadFavoriteStatus();
+  }
+
+  Future<void> _loadFavoriteStatus() async {
+    final appState = Provider.of<AppState>(context, listen: false);
+    final nursery = appState.selectedNursery;
+    if (nursery != null) {
+      final isFav = await FavoritesService.isFavorite(nursery.id);
+      setState(() => _isFavorite = isFav);
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    final appState = Provider.of<AppState>(context, listen: false);
+    final nursery = appState.selectedNursery;
+    if (nursery != null) {
+      await FavoritesService.toggleFavorite(nursery.id);
+      final isFav = await FavoritesService.isFavorite(nursery.id);
+      setState(() => _isFavorite = isFav);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isFav ? 'Ajouté aux favoris' : 'Retiré des favoris',
+          ),
+          duration: const Duration(seconds: 2),
+          backgroundColor: const Color(0xFF00BFA5),
+        ),
+      );
+    }
   }
 
   Future<void> _loadReviews() async {
@@ -88,10 +120,22 @@ class _NurseryDetailsState extends State<NurseryDetails> {
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.favorite_border,
-                      color: Color(0xFF2C3E50)),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    transitionBuilder: (child, animation) {
+                      return ScaleTransition(
+                        scale: animation,
+                        child: child,
+                      );
+                    },
+                    child: Icon(
+                      _isFavorite ? Icons.favorite : Icons.favorite_border,
+                      key: ValueKey<bool>(_isFavorite),
+                      color: _isFavorite ? Colors.red : const Color(0xFF2C3E50),
+                    ),
+                  ),
                 ),
-                onPressed: () {},
+                onPressed: _toggleFavorite,
               ),
               IconButton(
                 icon: Container(
