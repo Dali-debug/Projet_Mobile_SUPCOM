@@ -597,4 +597,137 @@ router.post('/:nurseryId/schedule', async (req, res) => {
   }
 });
 
+// Get nursery statistics
+router.get('/:nurseryId/statistics', async (req, res) => {
+  const { nurseryId } = req.params;
+
+  try {
+    // Get enrollment statistics
+    const enrollmentStats = await pool.query(`
+      SELECT 
+        COUNT(*) as total_enrollments,
+        COUNT(*) FILTER (WHERE status = 'active') as active_enrollments,
+        COUNT(*) FILTER (WHERE status = 'pending') as pending_enrollments
+      FROM enrollments
+      WHERE nursery_id = $1
+    `, [nurseryId]);
+
+    // Get nursery information including price
+    const nurseryInfo = await pool.query(`
+      SELECT total_spots, available_spots, price_per_month
+      FROM nurseries
+      WHERE id = $1
+    `, [nurseryId]);
+
+    const pricePerMonth = nurseryInfo.rows[0]?.price_per_month || 0;
+
+    // Get financial statistics - count paid enrollments
+    const financialStats = await pool.query(`
+      SELECT 
+        COUNT(DISTINCT e.id) FILTER (WHERE p.status = 'completed') as paid_enrollments,
+        COUNT(DISTINCT e.id) as total_active_enrollments
+      FROM enrollments e
+      LEFT JOIN payments p ON e.id = p.enrollment_id
+      WHERE e.nursery_id = $1 AND e.status = 'active'
+    `, [nurseryId]);
+
+    const paidEnrollments = parseInt(financialStats.rows[0]?.paid_enrollments || 0);
+    const totalActiveEnrollments = parseInt(financialStats.rows[0]?.total_active_enrollments || 0);
+    
+    // Calculate revenues
+    const totalRevenue = paidEnrollments * pricePerMonth;
+    const monthlyRevenue = totalActiveEnrollments * pricePerMonth;
+
+    // Get rating statistics
+    const ratingStats = await pool.query(`
+      SELECT 
+        COALESCE(AVG(rating), 0) as average_rating,
+        COUNT(*) as total_reviews
+      FROM reviews
+      WHERE nursery_id = $1
+    `, [nurseryId]);
+
+    // Get age distribution
+    const ageDistribution = await pool.query(`
+      SELECT 
+        CASE 
+          WHEN EXTRACT(YEAR FROM AGE(c.date_of_birth)) < 1 THEN '0-1 ans'
+          WHEN EXTRACT(YEAR FROM AGE(c.date_of_birth)) < 2 THEN '1-2 ans'
+          WHEN EXTRACT(YEAR FROM AGE(c.date_of_birth)) < 3 THEN '2-3 ans'
+          ELSE '3-4 ans'
+        END as age_group,
+        COUNT(*) as count
+      FROM enrollments e
+      JOIN children c ON e.child_id = c.id
+      WHERE e.nursery_id = $1 AND e.status = 'active'
+      GROUP BY age_group
+      ORDER BY age_group
+    `, [nurseryId]);
+
+    // Get payment status - group by enrollment
+    const paymentStatus = await pool.query(`
+      SELECT 
+        COUNT(DISTINCT e.id) FILTER (
+          WHERE EXISTS (
+            SELECT 1 FROM payments p 
+            WHERE p.enrollment_id = e.id AND p.status = 'completed'
+          )
+        ) as paid,
+        COUNT(DISTINCT e.id) FILTER (
+          WHERE NOT EXISTS (
+            SELECT 1 FROM payments p 
+            WHERE p.enrollment_id = e.id AND p.status = 'completed'
+          ) AND EXISTS (
+            SELECT 1 FROM payments p 
+            WHERE p.enrollment_id = e.id AND p.status = 'pending'
+          )
+        ) as pending,
+        COUNT(DISTINCT e.id) FILTER (
+          WHERE EXISTS (
+            SELECT 1 FROM payments p 
+            WHERE p.enrollment_id = e.id AND p.status = 'failed'
+          )
+        ) as overdue
+      FROM enrollments e
+      WHERE e.nursery_id = $1 AND e.status = 'active'
+    `, [nurseryId]);
+
+    // Build age distribution object
+    const childrenByAgeGroup = {};
+    ageDistribution.rows.forEach(row => {
+      childrenByAgeGroup[row.age_group] = parseInt(row.count);
+    });
+
+    // Calculate capacity used
+    const totalSpots = nurseryInfo.rows[0]?.total_spots || 0;
+    const availableSpots = nurseryInfo.rows[0]?.available_spots || 0;
+    const capacityUsed = totalSpots - availableSpots;
+
+    // Build statistics response
+    const statistics = {
+      totalEnrollments: parseInt(enrollmentStats.rows[0].total_enrollments),
+      activeEnrollments: parseInt(enrollmentStats.rows[0].active_enrollments),
+      pendingEnrollments: parseInt(enrollmentStats.rows[0].pending_enrollments),
+      totalRevenue: totalRevenue,
+      monthlyRevenue: monthlyRevenue,
+      averageRating: parseFloat(parseFloat(ratingStats.rows[0].average_rating).toFixed(1)),
+      totalReviews: parseInt(ratingStats.rows[0].total_reviews),
+      capacityUsed: capacityUsed,
+      totalCapacity: totalSpots,
+      childrenByAgeGroup: childrenByAgeGroup,
+      paymentStats: {
+        paid: parseInt(paymentStatus.rows[0].paid || 0),
+        pending: parseInt(paymentStatus.rows[0].pending || 0),
+        overdue: parseInt(paymentStatus.rows[0].overdue || 0)
+      }
+    };
+
+    res.json(statistics);
+
+  } catch (error) {
+    console.error('Error fetching nursery statistics:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch statistics' });
+  }
+});
+
 module.exports = router;

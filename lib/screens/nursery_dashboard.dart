@@ -12,6 +12,7 @@ import 'notifications_screen.dart';
 import 'manage_enrolled_screen.dart';
 import 'nursery_performance_screen.dart';
 import 'nursery_financial_tracking_screen.dart';
+import 'nursery_statistics_screen.dart';
 
 class NurseryDashboard extends StatefulWidget {
   const NurseryDashboard({super.key});
@@ -843,15 +844,24 @@ class _NurseryDashboardState extends State<NurseryDashboard> {
                                   );
                                 },
                               ),
-                              const _QuickAction(
-                                icon: Icons.settings_rounded,
-                                label: 'Configuration',
-                                gradient: LinearGradient(
+                              _QuickAction(
+                                icon: Icons.bar_chart_rounded,
+                                label: 'Statistiques',
+                                gradient: const LinearGradient(
                                   colors: [
                                     Color(0xFF8B5CF6),
                                     Color(0xFF6366F1)
                                   ],
                                 ),
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const NurseryStatisticsScreen(),
+                                    ),
+                                  );
+                                },
                               ),
                             ],
                           ),
